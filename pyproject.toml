@@ -1,0 +1,20 @@
+[project]
+name = "python-reddit-scraper"
+version = "0.1.0"
+description = "Add your description here"
+authors = [{ name = "Tadeas Fort", email = "business@tadeasfort.com" }]
+dependencies = ["tqdm>=4.66.0"]
+readme = "README.md"
+requires-python = ">= 3.8"
+license = { text = "GPL-3.0" }
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[project.scripts]
+download-reddit-media = "python_reddit_scraper.download_reddit_media:main"
