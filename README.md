@@ -2,17 +2,17 @@
 
 A fast and organized Python script that parses saved Reddit JSON files and downloads all media (images, videos, GIFs) at the highest available resolution with real-time progress tracking.
 
-## ✨ Features
+## Features
 
-- **🎯 High-quality downloads**: Automatically selects highest resolution media
-- **⚡ Fast concurrent downloads**: Uses 16 parallel workers for maximum speed
-- **📁 Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` subdirectories
-- **📊 Real-time progress**: Beautiful progress bar with download rate and time estimation
-- **📅 Timestamped sessions**: Creates dated directories for each download session
-- **🔄 Deduplication**: Avoids downloading the same file twice
-- **🧹 Clean dependencies**: Minimal setup with only `tqdm` required
+- ** High-quality downloads**: Automatically selects highest resolution media
+- **Fast concurrent downloads**: Uses 16 parallel workers for maximum speed
+- **Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` subdirectories
+- **Real-time progress**: Beautiful progress bar with download rate and time estimation
+- **Timestamped sessions**: Creates dated directories for each download session
+- **Deduplication**: Avoids downloading the same file twice
+- **Clean dependencies**: Minimal setup with only `tqdm` required
 
-## 🚀 Installation
+## Installation
 
 Install dependencies using Rye:
 
@@ -52,16 +52,16 @@ rye run download-reddit-media
 The script will show a beautiful progress bar with real-time stats:
 
 ```bash
-🚀 Starting Reddit media downloader...
-📁 Output directory: ./downloads/2025-01-27_14-30-45
+Starting Reddit media downloader...
+Output directory: ./downloads/2025-01-27_14-30-45
 Found 150 posts to process
-🔍 Extracting media URLs...
+Extracting media URLs...
 Found 285 unique media files to download
-📥 Starting downloads with 16 parallel workers...
+Starting downloads with 16 parallel workers...
 Downloading: 100%|██████████| 285/285 [02:45<00:00, 1.72files/s] Downloaded: amazing_video.mp4
 ```
 
-## 📂 Output Structure
+## Output Structure
 
 Files are automatically organized in timestamped directories with type-based sorting:
 
@@ -87,35 +87,35 @@ downloads/
 **Final summary shows file counts:**
 
 ```bash
-🎉 Download complete!
+Download complete!
    ✓ Successful: 278
    ✗ Failed: 7
-   📁 Files saved to: ./downloads/2025-01-27_14-30-45
-   📂 Images: 156 files
-   📂 Videos: 89 files
-   📂 Gifs: 33 files
+   Files saved to: ./downloads/2025-01-27_14-30-45
+   Images: 156 files
+   Videos: 89 files
+   Gifs: 33 files
 ```
 
-## 🎯 Supported Media Types
+## Supported Media Types
 
 | Type | Extensions | Details |
 |------|------------|---------|
-| **📸 Images** | JPG, PNG, WebP | Highest resolution available |
-| **🎬 Videos** | MP4, WebM, MOV | Reddit videos with separate audio tracks |
-| **🎞️ GIFs** | GIF | Animated GIFs and GifV (auto-converted to MP4) |
-| **🖼️ Galleries** | Multiple formats | All images from Reddit gallery posts |
-| **🔗 External** | Various | Direct media URLs from imgur, redgifs, etc. |
+| **Images** | JPG, PNG, WebP | Highest resolution available |
+| **Videos** | MP4, WebM, MOV | Reddit videos with separate audio tracks |
+| **GIFs** | GIF | Animated GIFs and GifV (auto-converted to MP4) |
+| **Galleries** | Multiple formats | All images from Reddit gallery posts |
+| **External** | Various | Direct media URLs from imgur, redgifs, etc. |
 
-## ⚙️ Technical Details
+## Technical Details
 
-- **🐍 Minimal dependencies**: Python standard library + `tqdm` only
-- **🧠 Smart parsing**: Handles Reddit's complex data structures (galleries, videos, previews)
-- **🚀 High performance**: 16 concurrent workers for optimal download speed
-- **🌍 Cross-platform**: Sanitizes filenames for Windows/Mac/Linux compatibility
-- **🛡️ Anti-blocking**: Proper HTTP headers and user agent rotation
-- **💾 Memory efficient**: Streams large files without loading into memory
+- **Minimal dependencies**: Python standard library + `tqdm` only
+- **Smart parsing**: Handles Reddit's complex data structures (galleries, videos, previews)
+- **High performance**: 16 concurrent workers for optimal download speed
+- **Cross-platform**: Sanitizes filenames for Windows/Mac/Linux compatibility
+- **Anti-blocking**: Proper HTTP headers and user agent rotation
+- **Memory efficient**: Streams large files without loading into memory
 
-## 📜 License
+## License
 
 GPL-3.0
 
