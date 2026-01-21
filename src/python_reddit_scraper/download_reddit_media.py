@@ -54,6 +54,10 @@ def get_media_type(filename: str) -> str:
 
 def extract_media_urls(post_data: Dict) -> List[Dict[str, str]]:
     """Extract all media URLs from a Reddit post at highest resolution."""
+    # Handle None or invalid post_data
+    if post_data is None or not isinstance(post_data, dict):
+        return []
+
     media_urls = []
     post_id = post_data.get("id", "unknown")
     title = post_data.get("title", "")
@@ -72,7 +76,8 @@ def extract_media_urls(post_data: Dict) -> List[Dict[str, str]]:
 
     # 2. Gallery posts
     if post_data.get("is_gallery") and post_data.get("media_metadata"):
-        gallery_items = post_data.get("gallery_data", {}).get("items", [])
+        gallery_data = post_data.get("gallery_data") or {}
+        gallery_items = gallery_data.get("items", [])
         media_metadata = post_data["media_metadata"]
 
         for i, item in enumerate(gallery_items):
@@ -85,7 +90,7 @@ def extract_media_urls(post_data: Dict) -> List[Dict[str, str]]:
                     media_urls.append(
                         {
                             "url": url,
-                            "filename": f"{post_id}_{safe_title}_{i+1}{get_file_extension(url)}",
+                            "filename": f"{post_id}_{safe_title}_{i + 1}{get_file_extension(url)}",
                         }
                     )
 
@@ -249,6 +254,9 @@ def main():
 
     print("🔍 Extracting media URLs...")
     for post in posts:
+        # Skip None or invalid posts
+        if post is None or not isinstance(post, dict):
+            continue
         media_urls = extract_media_urls(post)
         for media in media_urls:
             url = media["url"]
