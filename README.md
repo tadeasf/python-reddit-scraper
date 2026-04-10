@@ -98,7 +98,7 @@ uv run download-reddit-media --from-json
 ```
 Options:
   -s, --subreddits TEXT    Comma-separated subreddit names
-  -o, --output-dir TEXT    Base directory for downloads (default: ./downloads)
+  -o, --output-dir TEXT    Base directory for downloads (default: ./redditdownloads)
   --video-only             Download only videos and GIFs/animations
   --image-only             Download only images
   --from-json              Use existing JSON files in ./input/ instead of scraping
@@ -128,10 +128,10 @@ Session state is saved to `.scraper-state/` after scraping completes. If downloa
 ## Output Structure
 
 Files are automatically organized by subreddit and media type inside the
-output directory (`./downloads` by default, configurable with `-o`):
+output directory (`./redditdownloads` by default, configurable with `-o`):
 
 ```bash
-downloads/
+redditdownloads/
 └── 2025-01-27_14-30-45/
     ├── wallpapers/
     │   ├── images/

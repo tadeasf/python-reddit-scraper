@@ -40,7 +40,7 @@ download-reddit-media [OPTIONS]
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--output-dir` | `-o` | `./downloads` | Base directory for downloaded files (timestamped subdirectory created inside) |
+| `--output-dir` | `-o` | `./redditdownloads` | Base directory for downloaded files (timestamped subdirectory created inside) |
 | `--workers` | `-w` | `16` | Number of parallel download threads |
 | `--resume` | | `false` | Resume the most recent interrupted download session |
 

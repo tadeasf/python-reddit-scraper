@@ -74,7 +74,7 @@ download-reddit-media -s wallpapers,earthporn
 
 ### Custom output directory
 
-By default files are saved to `./downloads/` in the current working directory.
+By default files are saved to `./redditdownloads/` in the current working directory.
 Use `-o` / `--output-dir` to change it:
 
 ```bash

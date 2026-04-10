@@ -44,7 +44,7 @@ def download(
             "-o",
             help="Base directory for downloaded files. A timestamped subdirectory is created inside.",
         ),
-    ] = "./downloads",
+    ] = "./redditdownloads",
     video_only: Annotated[
         bool,
         typer.Option("--video-only", help="Download only videos and GIFs/animations."),

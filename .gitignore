@@ -9,6 +9,6 @@ wheels/
 # venv
 .venv
 input
-downloads
+redditdownloads
 .env
 threads_to_scrape.txt
