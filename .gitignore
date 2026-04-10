@@ -11,3 +11,4 @@ wheels/
 input
 downloads
 .env
+threads_to_scrape.txt
