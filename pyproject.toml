@@ -1,6 +1,6 @@
 [project]
 name = "python-reddit-scraper"
-version = "0.1.0"
+version = "1.0.0"
 description = "Add your description here"
 authors = [{ name = "Tadeas Fort", email = "business@tadeasfort.com" }]
 dependencies = [
