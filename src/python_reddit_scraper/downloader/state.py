@@ -124,8 +124,7 @@ class SessionState:
         self.save()
 
     def mark_downloaded(self, url: str, batch_size: int = 50) -> None:
-        """
-        Mark a media URL as successfully downloaded.
+        """Mark a media URL as successfully downloaded.
 
         State is flushed to disk every ``batch_size`` completions for performance.
 
@@ -142,12 +141,30 @@ class SessionState:
             if self._dirty_count >= batch_size:
                 self.save()
 
-    def get_pending_media(self) -> list[dict]:
+    def mark_permanently_failed(self, url: str, reason: str, permanent: bool) -> None:
+        """Mark a media URL as permanently failed (e.g. HTTP 403/404).
+
+        These items will be skipped on future resume attempts.
+        Only stores permanent failures; transient ones can be retried.
         """
-        Get media items that have not yet been downloaded.
+        if not permanent:
+            return
+        with self._lock:
+            for item in self.media:
+                if item["url"] == url:
+                    item["failed"] = True
+                    item["fail_reason"] = reason
+                    break
+            self._dirty_count += 1
+            if self._dirty_count >= 50:
+                self.save()
+
+    def get_pending_media(self) -> list[dict]:
+        """Get media items that have not yet been downloaded.
 
         Also checks whether the file already exists on disk (handles
         the case where the file was downloaded but state wasn't saved).
+        Permanently failed items (HTTP 403/404) are skipped.
 
         Returns:
             List of media dicts that still need downloading.
@@ -157,6 +174,8 @@ class SessionState:
         pending = []
         for item in self.media:
             if item.get("downloaded"):
+                continue
+            if item.get("failed"):
                 continue
             media_type = get_media_type(item["filename"])
             sub = item.get("subreddit")

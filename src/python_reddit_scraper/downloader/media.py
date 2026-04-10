@@ -47,6 +47,30 @@ def is_media_url(url: str) -> bool:
     )
 
 
+def _build_audio_entries(video_url: str, post_id: str, safe_title: str) -> list[dict[str, str]]:
+    """Build audio download entries for a Reddit video.
+
+    Generates candidate audio URLs with ``?source=fallback`` and marks them
+    as optional so the downloader can gracefully skip 403 responses.
+    """
+    base_url = video_url.rsplit("/", 1)[0]
+    # Primary: DASH_audio.mp4 with fallback param (matches video URL pattern)
+    # Alternatives: newer DASH_AUDIO_128/64 format used by some Reddit videos
+    audio_urls = [
+        f"{base_url}/DASH_audio.mp4?source=fallback",
+        f"{base_url}/DASH_AUDIO_128.mp4?source=fallback",
+        f"{base_url}/DASH_AUDIO_64.mp4?source=fallback",
+    ]
+    return [
+        {
+            "url": audio_urls[0],
+            "filename": f"{post_id}_{safe_title}_audio.mp4",
+            "optional": "true",
+            "audio_fallbacks": "|".join(audio_urls[1:]),
+        }
+    ]
+
+
 def extract_media_urls(post_data: dict) -> list[dict[str, str]]:
     """Extract all media URLs from a Reddit post at highest resolution."""
     if post_data is None or not isinstance(post_data, dict):
@@ -97,11 +121,7 @@ def extract_media_urls(post_data: dict) -> list[dict[str, str]]:
                 media_urls.append(
                     {"url": video_url, "filename": f"{post_id}_{safe_title}_video.mp4"}
                 )
-                base_url = video_url.rsplit("/", 1)[0]
-                audio_url = f"{base_url}/DASH_audio.mp4"
-                media_urls.append(
-                    {"url": audio_url, "filename": f"{post_id}_{safe_title}_audio.mp4"}
-                )
+                media_urls.extend(_build_audio_entries(video_url, post_id, safe_title))
 
     # 4. Reddit video preview (embedded videos from redgifs, external hosts, etc.)
     preview = post_data.get("preview", {})
@@ -134,14 +154,7 @@ def extract_media_urls(post_data: dict) -> list[dict[str, str]]:
                                 "filename": f"{post_id}_{safe_title}_video.mp4",
                             }
                         )
-                        base_url = video_url.rsplit("/", 1)[0]
-                        audio_url = f"{base_url}/DASH_audio.mp4"
-                        media_urls.append(
-                            {
-                                "url": audio_url,
-                                "filename": f"{post_id}_{safe_title}_audio.mp4",
-                            }
-                        )
+                        media_urls.extend(_build_audio_entries(video_url, post_id, safe_title))
 
     # 6. Preview images/GIFs
     if isinstance(preview, dict) and "images" in preview and preview["images"]:

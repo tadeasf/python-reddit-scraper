@@ -171,33 +171,82 @@ def _handle_resume(workers: int) -> None:
     state = SessionState.load(state_path)
     output_dir = state.output_dir
 
+    # Re-scrape subreddits that were still pending (not yet scraped) when interrupted
+    pending_subs = [sub for sub, status in state.subreddits.items() if status == "pending"]
+    if pending_subs:
+        logger.info(
+            "Re-scraping {} unfinished subreddit(s): {}",
+            len(pending_subs),
+            ", ".join(f"r/{s}" for s in pending_subs),
+        )
+        try:
+            from python_reddit_scraper.cli.prompt import check_camoufox_binary
+            from python_reddit_scraper.scraper.parallel import scrape_parallel
+
+            check_camoufox_binary()
+
+            def on_sub_complete(sub: str, posts: list[dict]):
+                state.mark_subreddit_scraped(sub)
+                media = extract_all_media(posts)
+                media = filter_by_media_type(
+                    media,
+                    video_only=state.video_only,
+                    image_only=state.image_only,
+                )
+                if media:
+                    state.set_media_manifest(state.media + media)
+                state.save()
+                logger.info("r/{}: scraped {} media items", sub, len(media))
+
+            scrape_parallel(
+                pending_subs,
+                max_pages=50,
+                max_workers=min(len(pending_subs), 4),
+                on_complete=on_sub_complete,
+            )
+        except Exception as exc:
+            logger.warning("Could not re-scrape pending subreddits: {}", exc)
+            logger.info("Continuing with existing media manifest")
+
     pending = state.get_pending_media()
     total = len(state.media)
-    done = total - len(pending)
-    logger.info("{}/{} files already downloaded, {} remaining", done, total, len(pending))
+    failed_count = sum(1 for m in state.media if m.get("failed"))
+    done = sum(1 for m in state.media if m.get("downloaded"))
+    logger.info(
+        "{}/{} downloaded, {} remaining, {} permanently failed",
+        done,
+        total,
+        len(pending),
+        failed_count,
+    )
 
     if not pending:
-        logger.success("All files already downloaded!")
+        logger.success("All downloadable files complete!")
         state.flush_and_cleanup()
         return
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    ok, fail = download_all(
+    ok, fail, _errors = download_all(
         pending,
         output_dir,
         workers=workers,
         on_file_done=state.mark_downloaded,
+        on_file_failed=state.mark_permanently_failed,
     )
 
     logger.success("Resume complete! {} successful, {} failed", ok, fail)
 
-    if fail == 0:
+    remaining = state.get_pending_media()
+    if not remaining:
         state.flush_and_cleanup()
-        logger.info("State file cleaned up")
+        logger.info("State file cleaned up — all done!")
     else:
         state.save()
-        logger.info("Resume again with: rye run download-reddit-media --resume")
+        logger.info(
+            "{} files still pending — resume again with: download-reddit-media --resume",
+            len(remaining),
+        )
 
 
 def _handle_from_json(
@@ -228,7 +277,7 @@ def _handle_from_json(
     session_dir = _build_output_dir(base_output_dir)
 
     logger.info("Downloading {} files with {} workers...", len(all_media), workers)
-    ok, fail = download_all(all_media, session_dir, workers=workers)
+    ok, fail, _errors = download_all(all_media, session_dir, workers=workers)
 
     subs = sorted({m.get("subreddit", "") for m in all_media} - {""})
     _print_summary(session_dir, ok, fail, subs)

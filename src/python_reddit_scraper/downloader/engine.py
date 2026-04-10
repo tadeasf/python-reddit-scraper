@@ -2,7 +2,10 @@
 
 import os
 import queue
+import time
+from collections import Counter
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from loguru import logger
@@ -14,30 +17,69 @@ from python_reddit_scraper.downloader.media import (
     get_media_type,
 )
 
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
+    ),
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.reddit.com/",
+}
 
-def download_file(url: str, filepath: str, pbar: tqdm) -> bool:
-    """Download a file from URL to filepath."""
-    try:
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+# HTTP codes that should not be retried
+_PERMANENT_CODES = {400, 401, 403, 404, 410, 451}
+_MAX_RETRIES = 3
+_BACKOFF_BASE = 1.5
 
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
-            ),
-            "Accept": "*/*",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
 
-        req = Request(url, headers=headers)
-        with urlopen(req, timeout=30) as response, open(filepath, "wb") as f:
-            f.write(response.read())
+def _fetch_url(url: str, filepath: str) -> None:
+    """Fetch *url* into *filepath* using urllib."""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    req = Request(url, headers=_HEADERS)
+    with urlopen(req, timeout=30) as response, open(filepath, "wb") as f:
+        f.write(response.read())
 
-        pbar.set_postfix_str(f"Downloaded: {Path(filepath).name}")
-        return True
 
-    except Exception:
-        pbar.set_postfix_str(f"Failed: {Path(filepath).name}")
-        return False
+def download_file(
+    url: str,
+    filepath: str,
+    pbar: tqdm,
+    *,
+    fallback_urls: list[str] | None = None,
+) -> tuple[bool, str]:
+    """Download a file from URL to filepath with retries.
+
+    Returns:
+        ``(True, "")`` on success, or ``(False, reason)`` on failure.
+        *reason* is a short label like ``"http_403"`` or ``"timeout"``.
+    """
+    all_urls = [url] + (fallback_urls or [])
+
+    for candidate_url in all_urls:
+        for attempt in range(_MAX_RETRIES):
+            try:
+                _fetch_url(candidate_url, filepath)
+                pbar.set_postfix_str(f"Downloaded: {Path(filepath).name}")
+                return True, ""
+            except HTTPError as exc:
+                code = exc.code
+                reason = f"http_{code}"
+                if code in _PERMANENT_CODES:
+                    break  # try next fallback URL, don't retry this one
+                if attempt < _MAX_RETRIES - 1:
+                    time.sleep(_BACKOFF_BASE**attempt)
+                    continue
+            except (URLError, TimeoutError, OSError) as exc:
+                reason = "timeout" if "timed out" in str(exc) else "connection_error"
+                if attempt < _MAX_RETRIES - 1:
+                    time.sleep(_BACKOFF_BASE**attempt)
+                    continue
+            except Exception as exc:
+                reason = f"error_{type(exc).__name__}"
+                break
+
+    pbar.set_postfix_str(f"Failed: {Path(filepath).name}")
+    return False, reason
 
 
 def download_all(
@@ -45,23 +87,26 @@ def download_all(
     output_dir: str,
     workers: int = 16,
     on_file_done=None,
-) -> tuple[int, int]:
-    """
-    Download all media files concurrently.
+    on_file_failed=None,
+) -> tuple[int, int, Counter]:
+    """Download all media files concurrently.
 
     Args:
-        downloads: List of dicts with 'url', 'filename', and optionally 'subreddit' keys.
+        downloads: List of dicts with 'url', 'filename', optionally 'subreddit',
+            'optional', and 'audio_fallbacks' keys.
         output_dir: Base output directory (files sorted into subdirectories).
         workers: Number of parallel download threads.
-        on_file_done: Optional callback ``(url: str) -> None`` called after each
-            successful download (used for resume state tracking).
+        on_file_done: Optional callback ``(url: str) -> None`` on success.
+        on_file_failed: Optional callback ``(url: str, reason: str, permanent: bool) -> None``.
 
     Returns:
-        Tuple of (successful_count, failed_count).
+        Tuple of ``(successful, failed, error_counts)`` where *error_counts*
+        is a :class:`~collections.Counter` mapping reason labels to counts.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    download_pairs = []
+    # Build (url, filepath, fallback_urls, optional) tuples
+    download_items: list[tuple[str, str, list[str], bool]] = []
     for media in downloads:
         media_type = get_media_type(media["filename"])
         subreddit = media.get("subreddit")
@@ -69,13 +114,18 @@ def download_all(
             filepath = os.path.join(output_dir, subreddit, media_type, media["filename"])
         else:
             filepath = os.path.join(output_dir, media_type, media["filename"])
-        download_pairs.append((media["url"], filepath))
 
-    if not download_pairs:
-        return 0, 0
+        fallbacks = (
+            media.get("audio_fallbacks", "").split("|") if media.get("audio_fallbacks") else []
+        )
+        optional = media.get("optional") == "true"
+        download_items.append((media["url"], filepath, fallbacks, optional))
+
+    if not download_items:
+        return 0, 0, Counter()
 
     seen_dirs: set[str] = set()
-    for _, filepath in download_pairs:
+    for _, filepath, _, _ in download_items:
         d = os.path.dirname(filepath)
         if d not in seen_dirs:
             seen_dirs.add(d)
@@ -83,32 +133,59 @@ def download_all(
 
     successful = 0
     failed = 0
+    skipped_optional = 0
+    error_counts: Counter = Counter()
 
     pbar = tqdm(
-        total=len(download_pairs),
+        total=len(download_items),
         desc="Downloading",
         unit="files",
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
     )
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_download = {
-            executor.submit(download_file, url, filepath, pbar): (url, filepath)
-            for url, filepath in download_pairs
+        future_map = {
+            executor.submit(
+                download_file,
+                url,
+                filepath,
+                pbar,
+                fallback_urls=fallbacks,
+            ): (url, filepath, optional)
+            for url, filepath, fallbacks, optional in download_items
         }
-        for future in as_completed(future_to_download):
-            url, filepath = future_to_download[future]
-            success = future.result()
+        for future in as_completed(future_map):
+            url, filepath, is_optional = future_map[future]
+            success, reason = future.result()
             if success:
                 successful += 1
                 if on_file_done:
                     on_file_done(url)
             else:
-                failed += 1
+                permanent = (
+                    reason.startswith("http_") and int(reason.split("_")[1]) in _PERMANENT_CODES
+                )
+                if is_optional and permanent:
+                    skipped_optional += 1
+                else:
+                    failed += 1
+                error_counts[reason] += 1
+                if on_file_failed:
+                    on_file_failed(url, reason, permanent)
             pbar.update(1)
 
     pbar.close()
-    return successful, failed
+
+    if skipped_optional:
+        logger.info(
+            "Skipped {} optional files (audio tracks blocked by Reddit CDN)",
+            skipped_optional,
+        )
+    if error_counts:
+        summary = ", ".join(f"{c}x {r}" for r, c in error_counts.most_common())
+        logger.warning("Download errors: {}", summary)
+
+    return successful, failed, error_counts
 
 
 def run_download_queue(
@@ -119,8 +196,7 @@ def run_download_queue(
     image_only: bool,
     state=None,
 ) -> tuple[int, int]:
-    """
-    Consumer thread: pulls (subreddit, posts) from queue, downloads one sub at a time.
+    """Consumer thread: pulls (subreddit, posts) from queue, downloads one sub at a time.
 
     Returns cumulative (successful, failed) counts.
     """
@@ -144,11 +220,12 @@ def run_download_queue(
             state.set_media_manifest(state.media + media)
 
         logger.info("r/{}: downloading {} files...", sub, len(media))
-        ok, fail = download_all(
+        ok, fail, _errors = download_all(
             media,
             output_dir,
             workers=workers,
             on_file_done=state.mark_downloaded if state else None,
+            on_file_failed=state.mark_permanently_failed if state else None,
         )
         total_ok += ok
         total_fail += fail

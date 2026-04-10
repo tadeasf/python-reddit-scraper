@@ -61,49 +61,9 @@ def write_version(new: str) -> None:
         INIT_PY.write_text(init)
 
 
-def prompt_user(current: str) -> str | None:
-    """Ask the user which part to bump (or skip). Returns part name or None."""
-    try:
-        tty = open("/dev/tty")  # noqa: SIM115
-    except OSError:
-        return None
-
-    major, minor, patch = current.split(".")
-    choices = {
-        "1": ("major", f"{int(major) + 1}.0.0"),
-        "2": ("minor", f"{major}.{int(minor) + 1}.0"),
-        "3": ("patch", f"{major}.{minor}.{int(patch) + 1}"),
-    }
-
-    print(f"\n  Current version: {current}", file=sys.stderr)
-    print("  Version bump options:", file=sys.stderr)
-    print(f"    [1] major  -> {choices['1'][1]}", file=sys.stderr)
-    print(f"    [2] minor  -> {choices['2'][1]}", file=sys.stderr)
-    print(f"    [3] patch  -> {choices['3'][1]}", file=sys.stderr)
-    print("    [s] skip   -> no version change", file=sys.stderr)
-    print("", file=sys.stderr)
-
-    try:
-        sys.stderr.write("  Bump version [1/2/3/s]: ")
-        sys.stderr.flush()
-        answer = tty.readline().strip().lower()
-    finally:
-        tty.close()
-
-    if answer in choices:
-        return choices[answer][0]
-    return None
-
-
 def main() -> None:
     current = read_version()
-    part = prompt_user(current)
-
-    if part is None:
-        print("  Skipping version bump.", file=sys.stderr)
-        return
-
-    new = bump(current, part)
+    new = bump(current, "patch")
     write_version(new)
     print(f"  Bumped version: {current} -> {new}", file=sys.stderr)
 
