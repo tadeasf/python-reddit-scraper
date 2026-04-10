@@ -3,7 +3,11 @@
 ## Usage
 
 ```bash
+# Development (Rye)
 rye run download-reddit-media [OPTIONS]
+
+# Global install
+download-reddit-media [OPTIONS]
 ```
 
 ## Options
@@ -36,6 +40,7 @@ rye run download-reddit-media [OPTIONS]
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
+| `--output-dir` | `-o` | `./downloads` | Base directory for downloaded files (timestamped subdirectory created inside) |
 | `--workers` | `-w` | `16` | Number of parallel download threads |
 | `--resume` | | `false` | Resume the most recent interrupted download session |
 
@@ -51,48 +56,51 @@ rye run download-reddit-media [OPTIONS]
 
 ```bash
 # Interactive — prompts for subreddit names
-rye run download-reddit-media
+download-reddit-media
 
 # Direct — pass subreddits on command line
-rye run download-reddit-media -s buildapc,dataengineering
+download-reddit-media -s buildapc,dataengineering
+
+# Custom output directory
+download-reddit-media -s wallpapers -o ~/Pictures/reddit
 ```
 
 ### Filtered downloads
 
 ```bash
 # Videos and animated GIFs only
-rye run download-reddit-media -s wallpapers --video-only
+download-reddit-media -s wallpapers --video-only
 
 # Images only (JPG, PNG, WebP)
-rye run download-reddit-media -s wallpapers --image-only
+download-reddit-media -s wallpapers --image-only
 ```
 
 ### JSON caching
 
 ```bash
 # Scrape + save JSON + download
-rye run download-reddit-media -s buildapc --save-json
+download-reddit-media -s buildapc --save-json
 
 # Re-download from saved JSON (no browser needed)
-rye run download-reddit-media --from-json
+download-reddit-media --from-json
 ```
 
 ### Resume interrupted downloads
 
 ```bash
 # Start a large download
-rye run download-reddit-media -s funny,pics,wallpapers
+download-reddit-media -s funny,pics,wallpapers
 
 # If interrupted (Ctrl+C, crash, etc.), resume:
-rye run download-reddit-media --resume
+download-reddit-media --resume
 ```
 
 ### Advanced
 
 ```bash
 # Limit scraping depth and download threads
-rye run download-reddit-media -s pics --max-pages 10 -w 8
+download-reddit-media -s pics --max-pages 10 -w 8
 
 # Combine flags
-rye run download-reddit-media -s earthporn --video-only --save-json --max-pages 20
+download-reddit-media -s earthporn --video-only --save-json --max-pages 20 -o /data/reddit
 ```

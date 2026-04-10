@@ -11,6 +11,7 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 - **Interactive prompt**: Enter subreddit names interactively or via CLI flags
 - **High-quality downloads**: Automatically selects highest resolution media
 - **Fast concurrent downloads**: Uses 16 parallel workers for maximum speed
+- **Configurable output**: `--output-dir` to choose where files are saved
 - **Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` per subreddit
 - **Media filtering**: `--video-only` or `--image-only` flags to download specific types
 - **Real-time progress**: Beautiful progress bars for both scraping and downloading
@@ -20,9 +21,13 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 
 ## Installation
 
-Install dependencies using Rye:
+### Development (with Rye)
+
+Clone the repo and install dependencies:
 
 ```bash
+git clone https://github.com/tadeasf/python-reddit-scraper.git
+cd python-reddit-scraper
 rye sync
 ```
 
@@ -31,6 +36,17 @@ Then download the stealth Firefox binary (one-time setup, ~80 MB):
 ```bash
 rye run camoufox fetch
 ```
+
+### Global install (use anywhere)
+
+Install the package globally with `pipx` so you can run it from any directory:
+
+```bash
+pipx install git+https://github.com/tadeasf/python-reddit-scraper.git
+camoufox fetch
+```
+
+After this you can run `download-reddit-media` directly in any terminal without `rye run`.
 
 ## Quick Start
 
@@ -82,6 +98,7 @@ rye run download-reddit-media --from-json
 ```
 Options:
   -s, --subreddits TEXT    Comma-separated subreddit names
+  -o, --output-dir TEXT    Base directory for downloads (default: ./downloads)
   --video-only             Download only videos and GIFs/animations
   --image-only             Download only images
   --from-json              Use existing JSON files in ./input/ instead of scraping
@@ -110,7 +127,8 @@ Session state is saved to `.scraper-state/` after scraping completes. If downloa
 
 ## Output Structure
 
-Files are automatically organized by subreddit and media type:
+Files are automatically organized by subreddit and media type inside the
+output directory (`./downloads` by default, configurable with `-o`):
 
 ```bash
 downloads/
@@ -123,6 +141,13 @@ downloads/
         ├── images/
         ├── videos/
         └── gifs/
+```
+
+Use `--output-dir` / `-o` to change the base path:
+
+```bash
+rye run download-reddit-media -s wallpapers -o ~/Pictures/reddit
+# Files will be saved to ~/Pictures/reddit/2025-01-27_14-30-45/wallpapers/...
 ```
 
 ## Advanced: Manual JSON Workflow

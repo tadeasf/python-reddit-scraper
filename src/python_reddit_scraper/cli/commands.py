@@ -20,6 +20,14 @@ from python_reddit_scraper.downloader.media import extract_all_media, filter_by_
 from python_reddit_scraper.scraper.json_io import parse_json_files
 
 
+def _build_output_dir(base: str) -> str:
+    """Create a timestamped output directory under *base* and return its path."""
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_dir = os.path.join(base, timestamp)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    return output_dir
+
+
 def download(
     subreddits: Annotated[
         str | None,
@@ -29,6 +37,14 @@ def download(
             help="Comma-separated subreddit names (e.g. 'buildapc,dataengineering').",
         ),
     ] = None,
+    output_dir: Annotated[
+        str,
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Base directory for downloaded files. A timestamped subdirectory is created inside.",
+        ),
+    ] = "./downloads",
     video_only: Annotated[
         bool,
         typer.Option("--video-only", help="Download only videos and GIFs/animations."),
@@ -72,7 +88,7 @@ def download(
         return
 
     if from_json:
-        _handle_from_json(video_only, image_only, workers)
+        _handle_from_json(video_only, image_only, workers, output_dir)
         return
 
     check_camoufox_binary()
@@ -82,9 +98,7 @@ def download(
     else:
         sub_list = prompt_subreddits()
 
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = os.path.join("./downloads", timestamp)
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    session_dir = _build_output_dir(output_dir)
 
     logger.info(
         "Scraping {} subreddit(s): {}",
@@ -96,7 +110,7 @@ def download(
     from python_reddit_scraper.scraper.json_io import save_scraped_json
     from python_reddit_scraper.scraper.parallel import scrape_parallel
 
-    state = SessionState(output_dir=output_dir, video_only=video_only, image_only=image_only)
+    state = SessionState(output_dir=session_dir, video_only=video_only, image_only=image_only)
     for sub in sub_list:
         state.subreddits[sub] = "pending"
     state.save()
@@ -106,7 +120,7 @@ def download(
 
     def download_consumer():
         ok, fail = run_download_queue(
-            download_q, output_dir, workers, video_only, image_only, state
+            download_q, session_dir, workers, video_only, image_only, state
         )
         download_results.append((ok, fail))
 
@@ -135,7 +149,7 @@ def download(
     total_ok = sum(r[0] for r in download_results)
     total_fail = sum(r[1] for r in download_results)
 
-    _print_summary(output_dir, total_ok, total_fail, list(state.subreddits.keys()))
+    _print_summary(session_dir, total_ok, total_fail, list(state.subreddits.keys()))
 
     if total_fail == 0:
         state.flush_and_cleanup()
@@ -186,7 +200,9 @@ def _handle_resume(workers: int) -> None:
         logger.info("Resume again with: rye run download-reddit-media --resume")
 
 
-def _handle_from_json(video_only: bool, image_only: bool, workers: int) -> None:
+def _handle_from_json(
+    video_only: bool, image_only: bool, workers: int, base_output_dir: str
+) -> None:
     """Handle --from-json mode: load JSON files and download."""
     logger.info("Loading posts from ./input/ JSON files...")
     posts = parse_json_files("./input")
@@ -209,15 +225,13 @@ def _handle_from_json(video_only: bool, image_only: bool, workers: int) -> None:
         logger.warning("No media files matched the filter criteria.")
         raise typer.Exit(0)
 
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = os.path.join("./downloads", timestamp)
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    session_dir = _build_output_dir(base_output_dir)
 
     logger.info("Downloading {} files with {} workers...", len(all_media), workers)
-    ok, fail = download_all(all_media, output_dir, workers=workers)
+    ok, fail = download_all(all_media, session_dir, workers=workers)
 
     subs = sorted({m.get("subreddit", "") for m in all_media} - {""})
-    _print_summary(output_dir, ok, fail, subs)
+    _print_summary(session_dir, ok, fail, subs)
 
 
 def _print_summary(output_dir: str, successful: int, failed: int, subreddits: list[str]) -> None:
