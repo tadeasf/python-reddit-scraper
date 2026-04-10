@@ -1,8 +1,8 @@
 [project]
 name = "python-reddit-scraper"
 version = "1.0.0"
-description = "Add your description here"
-authors = [{ name = "Tadeas Fort", email = "business@tadeasfort.com" }]
+description = "Python tool for scraping and downloading media from Reddit"
+authors = [{ name = "Tadeáš Fořt", email = "tadeasfort@proton.me" }]
 dependencies = [
     "tqdm>=4.66.0",
     "camoufox>=0.4.0",

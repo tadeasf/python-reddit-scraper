@@ -5,3 +5,13 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: version-bump
+        name: version-bump
+        entry: python scripts/bump_version.py
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
