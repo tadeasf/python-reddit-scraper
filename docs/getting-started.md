@@ -3,11 +3,11 @@
 ## Prerequisites
 
 - Python 3.10+
-- [Rye](https://rye.astral.sh/) package manager (for development) **or** [pipx](https://pipx.pypa.io/) (for global install)
+- [uv](https://docs.astral.sh/uv/) package manager (for development) **or** [pipx](https://pipx.pypa.io/) (for global install)
 
 ## Installation
 
-### Option A: Development install (with Rye)
+### Option A: Development install (with uv)
 
 #### 1. Clone the repository
 
@@ -19,7 +19,7 @@ cd python-reddit-scraper
 #### 2. Install dependencies
 
 ```bash
-rye sync
+uv sync
 ```
 
 #### 3. Download the stealth browser binary
@@ -27,13 +27,13 @@ rye sync
 This is a one-time setup (~80 MB):
 
 ```bash
-rye run camoufox fetch
+uv run camoufox fetch
 ```
 
 !!! note
-    The tool will remind you to run `rye run camoufox fetch` if the binary is missing.
+    The tool will remind you to run `uv run camoufox fetch` if the binary is missing.
 
-With this setup, run the tool via `rye run download-reddit-media`.
+With this setup, run the tool via `uv run download-reddit-media`.
 
 ### Option B: Global install (use anywhere)
 
@@ -45,7 +45,7 @@ camoufox fetch
 ```
 
 !!! tip
-    After a global install you run `download-reddit-media` directly — no `rye run` prefix needed.
+    After a global install you run `download-reddit-media` directly — no `uv run` prefix needed.
     The `camoufox` command is also available globally via pipx's injected scripts.
 
 ## First Run
@@ -53,8 +53,8 @@ camoufox fetch
 ### Interactive mode
 
 ```bash
-# Rye
-rye run download-reddit-media
+# uv
+uv run download-reddit-media
 
 # Global install
 download-reddit-media

@@ -18,13 +18,13 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 
 ```bash
 # Scrape and download everything from two subreddits
-rye run download-reddit-media -s wallpapers,earthporn
+uv run download-reddit-media -s wallpapers,earthporn
 
 # Videos only, save JSON for later
-rye run download-reddit-media -s funny --video-only --save-json
+uv run download-reddit-media -s funny --video-only --save-json
 
 # Resume an interrupted download
-rye run download-reddit-media --resume
+uv run download-reddit-media --resume
 ```
 
 ## Navigation

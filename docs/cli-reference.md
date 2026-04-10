@@ -3,8 +3,8 @@
 ## Usage
 
 ```bash
-# Development (Rye)
-rye run download-reddit-media [OPTIONS]
+# Development (uv)
+uv run download-reddit-media [OPTIONS]
 
 # Global install
 download-reddit-media [OPTIONS]

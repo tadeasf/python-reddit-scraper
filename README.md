@@ -21,20 +21,20 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 
 ## Installation
 
-### Development (with Rye)
+### Development (with uv)
 
 Clone the repo and install dependencies:
 
 ```bash
 git clone https://github.com/tadeasf/python-reddit-scraper.git
 cd python-reddit-scraper
-rye sync
+uv sync
 ```
 
 Then download the stealth Firefox binary (one-time setup, ~80 MB):
 
 ```bash
-rye run camoufox fetch
+uv run camoufox fetch
 ```
 
 ### Global install (use anywhere)
@@ -46,7 +46,7 @@ pipx install git+https://github.com/tadeasf/python-reddit-scraper.git
 camoufox fetch
 ```
 
-After this you can run `download-reddit-media` directly in any terminal without `rye run`.
+After this you can run `download-reddit-media` directly in any terminal without `uv run`.
 
 ## Quick Start
 
@@ -55,24 +55,24 @@ After this you can run `download-reddit-media` directly in any terminal without 
 Run the tool and enter subreddit names when prompted:
 
 ```bash
-rye run download-reddit-media
+uv run download-reddit-media
 # Enter subreddits (comma-separated): buildapc,dataengineering
 ```
 
 Or pass subreddits directly:
 
 ```bash
-rye run download-reddit-media --subreddits buildapc,dataengineering
+uv run download-reddit-media --subreddits buildapc,dataengineering
 ```
 
 ### Download only videos or images
 
 ```bash
 # Videos and GIFs only
-rye run download-reddit-media -s wallpapers --video-only
+uv run download-reddit-media -s wallpapers --video-only
 
 # Images only
-rye run download-reddit-media -s wallpapers --image-only
+uv run download-reddit-media -s wallpapers --image-only
 ```
 
 ### Resume interrupted downloads
@@ -80,17 +80,17 @@ rye run download-reddit-media -s wallpapers --image-only
 If a download is interrupted (Ctrl+C, crash, etc.), resume it:
 
 ```bash
-rye run download-reddit-media --resume
+uv run download-reddit-media --resume
 ```
 
 ### Save scraped JSON for later
 
 ```bash
 # Scrape and save JSON + download
-rye run download-reddit-media -s buildapc --save-json
+uv run download-reddit-media -s buildapc --save-json
 
 # Re-download from saved JSON (no browser needed)
-rye run download-reddit-media --from-json
+uv run download-reddit-media --from-json
 ```
 
 ### All options
@@ -146,7 +146,7 @@ downloads/
 Use `--output-dir` / `-o` to change the base path:
 
 ```bash
-rye run download-reddit-media -s wallpapers -o ~/Pictures/reddit
+uv run download-reddit-media -s wallpapers -o ~/Pictures/reddit
 # Files will be saved to ~/Pictures/reddit/2025-01-27_14-30-45/wallpapers/...
 ```
 
@@ -168,7 +168,7 @@ Save Reddit JSON data to the `./input` directory.
 ### 2. Run from saved JSON
 
 ```bash
-rye run download-reddit-media --from-json
+uv run download-reddit-media --from-json
 ```
 
 ## Documentation
@@ -178,7 +178,7 @@ Full documentation is available at: https://tadeasf.github.io/python-reddit-scra
 To build docs locally:
 
 ```bash
-rye run mkdocs serve
+uv run mkdocs serve
 ```
 
 ## Supported Media Types
