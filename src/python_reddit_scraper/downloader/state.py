@@ -1,8 +1,8 @@
 """
 Session state management for resume support.
 
-Persists scraping progress and download manifests to `.scraper-state/`
-so interrupted runs can be resumed with `--resume`.
+Persists scraping progress and download manifests to ``.scraper-state/``
+so interrupted runs can be resumed with ``--resume``.
 """
 
 import json
@@ -10,8 +10,6 @@ import os
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
 
 STATE_DIR = ".scraper-state"
 
@@ -36,13 +34,13 @@ class SessionState:
         output_dir: str,
         video_only: bool = False,
         image_only: bool = False,
-        state_path: Optional[str] = None,
+        state_path: str | None = None,
     ):
         self.output_dir = output_dir
         self.video_only = video_only
         self.image_only = image_only
-        self.subreddits: dict[str, str] = {}  # sub -> "scraped"|"pending"
-        self.media: list[dict] = []  # each has url, filename, subreddit, downloaded
+        self.subreddits: dict[str, str] = {}
+        self.media: list[dict] = []
         self._lock = threading.Lock()
         self._dirty_count = 0
 
@@ -83,7 +81,7 @@ class SessionState:
         Returns:
             A populated SessionState instance.
         """
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         filters = data.get("filters", {})
@@ -98,7 +96,7 @@ class SessionState:
         return state
 
     @classmethod
-    def find_latest(cls) -> Optional[str]:
+    def find_latest(cls) -> str | None:
         """
         Find the most recent state file in the state directory.
 
@@ -122,10 +120,7 @@ class SessionState:
         Each item should have ``url``, ``filename``, ``subreddit`` keys.
         A ``downloaded`` field is added and defaults to ``False``.
         """
-        self.media = [
-            {**m, "downloaded": m.get("downloaded", False)}
-            for m in media_list
-        ]
+        self.media = [{**m, "downloaded": m.get("downloaded", False)} for m in media_list]
         self.save()
 
     def mark_downloaded(self, url: str, batch_size: int = 50) -> None:
@@ -157,13 +152,12 @@ class SessionState:
         Returns:
             List of media dicts that still need downloading.
         """
-        from python_reddit_scraper.download_reddit_media import get_media_type
+        from python_reddit_scraper.downloader.media import get_media_type
 
         pending = []
         for item in self.media:
             if item.get("downloaded"):
                 continue
-            # Double-check: file might exist on disk even if state says not downloaded
             media_type = get_media_type(item["filename"])
             sub = item.get("subreddit")
             if sub:
@@ -178,13 +172,10 @@ class SessionState:
 
     def flush_and_cleanup(self) -> None:
         """Save final state and remove the state file on completion."""
+        import contextlib
+
         self.save()
-        try:
+        with contextlib.suppress(OSError):
             os.remove(self.state_path)
-        except OSError:
-            pass
-        # Remove state dir if empty
-        try:
+        with contextlib.suppress(OSError):
             os.rmdir(STATE_DIR)
-        except OSError:
-            pass

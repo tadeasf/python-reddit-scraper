@@ -29,7 +29,7 @@ rye sync
 Then download the stealth Firefox binary (one-time setup, ~80 MB):
 
 ```bash
-camoufox fetch
+rye run camoufox fetch
 ```
 
 ## Quick Start
@@ -158,13 +158,13 @@ rye run mkdocs serve
 
 ## Supported Media Types
 
-| Type | Extensions | Details |
-|------|------------|---------|
-| **Images** | JPG, PNG, WebP | Highest resolution available |
-| **Videos** | MP4, WebM, MOV | Reddit videos with separate audio tracks |
-| **GIFs** | GIF | Animated GIFs and GifV (auto-converted to MP4) |
-| **Galleries** | Multiple formats | All images from Reddit gallery posts |
-| **External** | Various | Direct media URLs from imgur, redgifs, etc. |
+| Type          | Extensions       | Details                                        |
+| ------------- | ---------------- | ---------------------------------------------- |
+| **Images**    | JPG, PNG, WebP   | Highest resolution available                   |
+| **Videos**    | MP4, WebM, MOV   | Reddit videos with separate audio tracks       |
+| **GIFs**      | GIF              | Animated GIFs and GifV (auto-converted to MP4) |
+| **Galleries** | Multiple formats | All images from Reddit gallery posts           |
+| **External**  | Various          | Direct media URLs from imgur, redgifs, etc.    |
 
 ## Technical Details
 
@@ -185,4 +185,4 @@ GPL-3.0
 
 ---
 
-**⭐ Star this repo if it helped you download your favorite Reddit media!**
+**Star this repo if it helped you download your favorite Reddit media!**

@@ -8,6 +8,7 @@ dependencies = [
     "camoufox>=0.4.0",
     "prompt-toolkit>=3.0.0",
     "typer>=0.15.0",
+    "loguru>=0.7.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -22,7 +23,32 @@ managed = true
 dev-dependencies = [
     "mkdocs-material>=9.6.0",
     "mkdocstrings[python]>=0.27.0",
+    "ruff>=0.9.0",
+    "pre-commit>=4.0.0",
 ]
 
 [project.scripts]
-download-reddit-media = "python_reddit_scraper.cli:app"
+download-reddit-media = "python_reddit_scraper.app:app"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function call in argument defaults (typer uses this)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["python_reddit_scraper"]

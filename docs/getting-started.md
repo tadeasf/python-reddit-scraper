@@ -25,11 +25,11 @@ rye sync
 This is a one-time setup (~80 MB):
 
 ```bash
-camoufox fetch
+rye run camoufox fetch
 ```
 
 !!! note
-    The tool will remind you to run `camoufox fetch` if the binary is missing.
+    The tool will remind you to run `rye run camoufox fetch` if the binary is missing.
 
 ## First Run
 

@@ -32,6 +32,8 @@ idna==3.11
     # via requests
 language-tags==1.2.0
     # via camoufox
+loguru==0.7.3
+    # via python-reddit-scraper
 lxml==6.0.3
     # via camoufox
 markdown-it-py==4.0.0
