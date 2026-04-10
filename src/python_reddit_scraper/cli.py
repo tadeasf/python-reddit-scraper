@@ -42,10 +42,10 @@ def _prompt_subreddits() -> list[str]:
 def _check_camoufox_binary() -> None:
     """Check if the camoufox Firefox binary is installed."""
     try:
-        from camoufox.utils import get_data_dir
+        from camoufox.pkgman import installed_verstr
 
-        data_dir = get_data_dir()
-        if not data_dir.exists() or not any(data_dir.iterdir()):
+        ver = installed_verstr()
+        if not ver:
             raise FileNotFoundError
     except Exception:
         typer.echo(
