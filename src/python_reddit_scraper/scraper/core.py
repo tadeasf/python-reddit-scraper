@@ -9,7 +9,14 @@ import json
 import time
 
 from loguru import logger
-from tqdm import tqdm
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
 
 def scrape_subreddit(
@@ -17,6 +24,7 @@ def scrape_subreddit(
     subreddit: str,
     max_pages: int = 50,
     delay: float = 1.5,
+    quiet: bool = False,
 ) -> list[dict]:
     """
     Scrape a subreddit's posts via Reddit's old JSON API.
@@ -26,6 +34,7 @@ def scrape_subreddit(
         subreddit: Subreddit name (without r/ prefix).
         max_pages: Maximum number of pages to fetch (100 posts per page).
         delay: Seconds to wait between page requests.
+        quiet: If True, suppress all progress output.
 
     Returns:
         List of post data dicts (the 'data' field of each child).
@@ -35,12 +44,23 @@ def scrape_subreddit(
     base_url = f"https://old.reddit.com/r/{subreddit}.json?limit=100&raw_json=1"
 
     page = browser.new_page()
-    pbar = tqdm(
-        total=max_pages,
-        desc=f"r/{subreddit}",
-        unit="page",
-        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} pages [{elapsed}] {postfix}",
+    progress = (
+        None
+        if quiet
+        else Progress(
+            SpinnerColumn(),
+            TextColumn(f"r/{subreddit}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("pages"),
+            TimeElapsedColumn(),
+            TextColumn("{task.fields[postfix]}"),
+        )
     )
+    task_id = None
+    if progress is not None:
+        progress.start()
+        task_id = progress.add_task(f"r/{subreddit}", total=max_pages, postfix="")
 
     try:
         for page_num in range(max_pages):
@@ -60,8 +80,8 @@ def scrape_subreddit(
                 if "data" in child:
                     posts.append(child["data"])
 
-            pbar.update(1)
-            pbar.set_postfix_str(f"{len(posts)} posts")
+            if progress is not None and task_id is not None:
+                progress.update(task_id, advance=1, postfix=f"{len(posts)} posts")
 
             after = data.get("data", {}).get("after")
             if after is None:
@@ -70,7 +90,8 @@ def scrape_subreddit(
             if page_num < max_pages - 1:
                 time.sleep(delay)
     finally:
-        pbar.close()
+        if progress is not None:
+            progress.stop()
         page.close()
 
     return posts

@@ -1,15 +1,20 @@
 """Download engine: concurrent file downloading with progress tracking."""
 
+from __future__ import annotations
+
 import os
 import queue
 import time
 from collections import Counter
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from loguru import logger
-from tqdm import tqdm
+
+if TYPE_CHECKING:
+    from python_reddit_scraper.progress import ProgressDisplay
 
 from python_reddit_scraper.downloader.media import (
     extract_all_media,
@@ -43,7 +48,6 @@ def _fetch_url(url: str, filepath: str) -> None:
 def download_file(
     url: str,
     filepath: str,
-    pbar: tqdm,
     *,
     fallback_urls: list[str] | None = None,
 ) -> tuple[bool, str]:
@@ -59,7 +63,6 @@ def download_file(
         for attempt in range(_MAX_RETRIES):
             try:
                 _fetch_url(candidate_url, filepath)
-                pbar.set_postfix_str(f"Downloaded: {Path(filepath).name}")
                 return True, ""
             except HTTPError as exc:
                 code = exc.code
@@ -78,7 +81,6 @@ def download_file(
                 reason = f"error_{type(exc).__name__}"
                 break
 
-    pbar.set_postfix_str(f"Failed: {Path(filepath).name}")
     return False, reason
 
 
@@ -88,6 +90,7 @@ def download_all(
     workers: int = 16,
     on_file_done=None,
     on_file_failed=None,
+    progress: ProgressDisplay | None = None,
 ) -> tuple[int, int, Counter]:
     """Download all media files concurrently.
 
@@ -98,6 +101,9 @@ def download_all(
         workers: Number of parallel download threads.
         on_file_done: Optional callback ``(url: str) -> None`` on success.
         on_file_failed: Optional callback ``(url: str, reason: str, permanent: bool) -> None``.
+        progress: Optional shared :class:`ProgressDisplay` instance. When *None*
+            (standalone / resume mode), a local ``rich.progress.Progress`` bar is
+            used as a fallback.
 
     Returns:
         Tuple of ``(successful, failed, error_counts)`` where *error_counts*
@@ -136,45 +142,59 @@ def download_all(
     skipped_optional = 0
     error_counts: Counter = Counter()
 
-    pbar = tqdm(
-        total=len(download_items),
-        desc="Downloading",
-        unit="files",
-        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
-    )
+    # Fallback: local rich progress bar when no shared ProgressDisplay is provided
+    local_progress = None
+    local_task_id = None
+    if progress is None:
+        import rich.progress
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {
-            executor.submit(
-                download_file,
-                url,
-                filepath,
-                pbar,
-                fallback_urls=fallbacks,
-            ): (url, filepath, optional)
-            for url, filepath, fallbacks, optional in download_items
-        }
-        for future in as_completed(future_map):
-            url, filepath, is_optional = future_map[future]
-            success, reason = future.result()
-            if success:
-                successful += 1
-                if on_file_done:
-                    on_file_done(url)
-            else:
-                permanent = (
-                    reason.startswith("http_") and int(reason.split("_")[1]) in _PERMANENT_CODES
-                )
-                if is_optional and permanent:
-                    skipped_optional += 1
+        local_progress = rich.progress.Progress(
+            rich.progress.TextColumn("[bold blue]{task.description}"),
+            rich.progress.BarColumn(),
+            rich.progress.MofNCompleteColumn(),
+            rich.progress.TimeElapsedColumn(),
+            rich.progress.TransferSpeedColumn(),
+        )
+        local_progress.start()
+        local_task_id = local_progress.add_task("Downloading", total=len(download_items))
+
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_map = {
+                executor.submit(
+                    download_file,
+                    url,
+                    filepath,
+                    fallback_urls=fallbacks,
+                ): (url, filepath, optional)
+                for url, filepath, fallbacks, optional in download_items
+            }
+            for future in as_completed(future_map):
+                url, filepath, is_optional = future_map[future]
+                success, reason = future.result()
+                if success:
+                    successful += 1
+                    if on_file_done:
+                        on_file_done(url)
                 else:
-                    failed += 1
-                error_counts[reason] += 1
-                if on_file_failed:
-                    on_file_failed(url, reason, permanent)
-            pbar.update(1)
+                    permanent = (
+                        reason.startswith("http_") and int(reason.split("_")[1]) in _PERMANENT_CODES
+                    )
+                    if is_optional and permanent:
+                        skipped_optional += 1
+                    else:
+                        failed += 1
+                    error_counts[reason] += 1
+                    if on_file_failed:
+                        on_file_failed(url, reason, permanent)
 
-    pbar.close()
+                if progress is not None:
+                    progress.advance_download()
+                elif local_progress is not None and local_task_id is not None:
+                    local_progress.advance(local_task_id)
+    finally:
+        if local_progress is not None:
+            local_progress.stop()
 
     if skipped_optional:
         logger.info(
@@ -189,12 +209,13 @@ def download_all(
 
 
 def run_download_queue(
-    download_q: "queue.Queue[tuple[str, list[dict]] | None]",
+    download_q: queue.Queue[tuple[str, list[dict]] | None],
     output_dir: str,
     workers: int,
     video_only: bool,
     image_only: bool,
     state=None,
+    progress: ProgressDisplay | None = None,
 ) -> tuple[int, int]:
     """Consumer thread: pulls (subreddit, posts) from queue, downloads one sub at a time.
 
@@ -219,6 +240,9 @@ def run_download_queue(
         if state:
             state.set_media_manifest(state.media + media)
 
+        if progress is not None:
+            progress.init_download(total_files=len(media), sub=sub, queued=download_q.qsize())
+
         logger.info("r/{}: downloading {} files...", sub, len(media))
         ok, fail, _errors = download_all(
             media,
@@ -226,6 +250,7 @@ def run_download_queue(
             workers=workers,
             on_file_done=state.mark_downloaded if state else None,
             on_file_failed=state.mark_permanently_failed if state else None,
+            progress=progress,
         )
         total_ok += ok
         total_fail += fail

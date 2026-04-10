@@ -1,16 +1,22 @@
 """Loguru logging configuration for the Reddit media downloader."""
 
-import sys
-
 from loguru import logger
+from rich.console import Console
+
+_console = Console(stderr=True)
+
+log_console = _console
+
+
+def _rich_sink(message: str) -> None:
+    _console.print(message, end="", highlight=False, markup=False)
+
 
 logger.remove()
 
 logger.add(
-    sys.stderr,
-    format=(
-        "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
-    ),
+    _rich_sink,
+    format="{time:HH:mm:ss} | {level: <8} | {message}",
     level="INFO",
-    colorize=True,
+    colorize=False,
 )

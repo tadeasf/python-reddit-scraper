@@ -20,6 +20,14 @@ from python_reddit_scraper.downloader.media import extract_all_media, filter_by_
 from python_reddit_scraper.scraper.json_io import parse_json_files
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        from python_reddit_scraper import __app_name__, __version__
+
+        print(f"{__app_name__} {__version__}")
+        raise typer.Exit()
+
+
 def _build_output_dir(base: str) -> str:
     """Create a timestamped output directory under *base* and return its path."""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -77,6 +85,16 @@ def download(
         bool,
         typer.Option("--resume", help="Resume the most recent interrupted download session."),
     ] = False,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = False,
 ) -> None:
     """Download media from Reddit subreddits."""
     if video_only and image_only:
@@ -107,6 +125,7 @@ def download(
     )
 
     from python_reddit_scraper.downloader.state import SessionState
+    from python_reddit_scraper.progress import ProgressDisplay
     from python_reddit_scraper.scraper.json_io import save_scraped_json
     from python_reddit_scraper.scraper.parallel import scrape_parallel
 
@@ -118,9 +137,11 @@ def download(
     download_q: queue.Queue[tuple[str, list[dict]] | None] = queue.Queue()
     download_results: list[tuple[int, int]] = []
 
+    progress = ProgressDisplay(total_subs=len(sub_list))
+
     def download_consumer():
         ok, fail = run_download_queue(
-            download_q, session_dir, workers, video_only, image_only, state
+            download_q, session_dir, workers, video_only, image_only, state, progress=progress
         )
         download_results.append((ok, fail))
 
@@ -136,15 +157,17 @@ def download(
         state.save()
         download_q.put((sub, posts))
 
-    scrape_parallel(
-        sub_list,
-        max_pages=max_pages,
-        max_workers=min(len(sub_list), 4),
-        on_complete=on_sub_complete,
-    )
+    with progress:
+        scrape_parallel(
+            sub_list,
+            max_pages=max_pages,
+            max_workers=min(len(sub_list), 4),
+            on_complete=on_sub_complete,
+            progress=progress,
+        )
 
-    download_q.put(None)
-    consumer.join()
+        download_q.put(None)
+        consumer.join()
 
     total_ok = sum(r[0] for r in download_results)
     total_fail = sum(r[1] for r in download_results)

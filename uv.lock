@@ -1188,13 +1188,13 @@ wheels = [
 
 [[package]]
 name = "python-reddit-scraper"
-version = "1.0.2"
+version = "1.0.5"
 source = { editable = "." }
 dependencies = [
     { name = "camoufox" },
     { name = "loguru" },
     { name = "prompt-toolkit" },
-    { name = "tqdm" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -1211,7 +1211,7 @@ requires-dist = [
     { name = "camoufox", specifier = ">=0.4.0" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.0" },
-    { name = "tqdm", specifier = ">=4.66.0" },
+    { name = "rich", specifier = ">=13.0" },
     { name = "typer", specifier = ">=0.15.0" },
 ]
 

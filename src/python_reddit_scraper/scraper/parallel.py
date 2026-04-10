@@ -1,12 +1,18 @@
 """Parallel multi-process scraping of multiple subreddits."""
 
+from __future__ import annotations
+
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
+if TYPE_CHECKING:
+    from python_reddit_scraper.progress import ProgressDisplay
+
 
 def scrape_worker(
-    subreddit: str, max_pages: int = 50, delay: float = 1.5
+    subreddit: str, max_pages: int = 50, delay: float = 1.5, quiet: bool = False
 ) -> tuple[str, list[dict]]:
     """
     Standalone scrape function for use with ProcessPoolExecutor.
@@ -18,6 +24,7 @@ def scrape_worker(
         subreddit: Subreddit name (without r/ prefix).
         max_pages: Maximum pages to fetch.
         delay: Seconds between page requests.
+        quiet: Suppress per-subreddit progress output.
 
     Returns:
         Tuple of (subreddit_name, list_of_post_dicts).
@@ -27,7 +34,7 @@ def scrape_worker(
     from python_reddit_scraper.scraper.core import scrape_subreddit
 
     with Camoufox(headless=True) as browser:
-        posts = scrape_subreddit(browser, subreddit, max_pages=max_pages, delay=delay)
+        posts = scrape_subreddit(browser, subreddit, max_pages=max_pages, delay=delay, quiet=quiet)
     return subreddit, posts
 
 
@@ -37,6 +44,7 @@ def scrape_parallel(
     delay: float = 1.5,
     max_workers: int = 4,
     on_complete=None,
+    progress: ProgressDisplay | None = None,
 ) -> dict[str, list[dict]]:
     """
     Scrape multiple subreddits in parallel using separate processes.
@@ -52,27 +60,38 @@ def scrape_parallel(
         max_workers: Maximum concurrent scraper processes.
         on_complete: Optional callback ``(sub: str, posts: list[dict]) -> None``
             invoked as each subreddit finishes scraping.
+        progress: Optional shared :class:`ProgressDisplay` for the scraping bar.
 
     Returns:
         Dict mapping subreddit name to its list of post dicts.
     """
     results: dict[str, list[dict]] = {}
     n_workers = min(len(subreddits), max_workers)
+    quiet = progress is not None
 
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         future_to_sub = {
-            executor.submit(scrape_worker, sub, max_pages, delay): sub for sub in subreddits
+            executor.submit(scrape_worker, sub, max_pages, delay, quiet=quiet): sub
+            for sub in subreddits
         }
+        for sub in subreddits:
+            if progress:
+                progress.mark_scrape_started(sub)
+
         for future in as_completed(future_to_sub):
             sub = future_to_sub[future]
             try:
                 _, posts = future.result()
                 results[sub] = posts
                 logger.info("r/{}: {} posts collected", sub, len(posts))
+                if progress:
+                    progress.mark_scrape_done(sub)
                 if on_complete:
                     on_complete(sub, posts)
             except Exception as exc:
                 logger.error("r/{}: scraping failed -- {}", sub, exc)
                 results[sub] = []
+                if progress:
+                    progress.mark_scrape_done(sub)
 
     return results
