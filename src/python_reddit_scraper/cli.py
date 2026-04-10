@@ -163,12 +163,28 @@ def download(
     typer.echo(f"   ✗ Failed: {failed}")
     typer.echo(f"   📁 Files saved to: {output_dir}")
 
-    for subdir in ["images", "videos", "gifs"]:
-        subdir_path = Path(output_dir, subdir)
-        if subdir_path.exists():
-            file_count = len(list(subdir_path.glob("*")))
-            if file_count > 0:
-                typer.echo(f"   📂 {subdir.capitalize()}: {file_count} files")
+    # Show per-subreddit stats
+    subreddits_in_media = sorted({m.get("subreddit", "") for m in all_media} - {""})
+    if subreddits_in_media:
+        for sub in subreddits_in_media:
+            sub_path = Path(output_dir, sub)
+            if sub_path.exists():
+                total = sum(1 for _ in sub_path.rglob("*") if _.is_file())
+                parts = []
+                for media_dir in ["images", "videos", "gifs"]:
+                    d = sub_path / media_dir
+                    if d.exists():
+                        n = len(list(d.glob("*")))
+                        if n:
+                            parts.append(f"{n} {media_dir}")
+                typer.echo(f"   📂 r/{sub}: {total} files ({', '.join(parts)})")
+    else:
+        for subdir in ["images", "videos", "gifs"]:
+            subdir_path = Path(output_dir, subdir)
+            if subdir_path.exists():
+                file_count = len(list(subdir_path.glob("*")))
+                if file_count > 0:
+                    typer.echo(f"   📂 {subdir.capitalize()}: {file_count} files")
 
 
 if __name__ == "__main__":

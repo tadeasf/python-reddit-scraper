@@ -94,10 +94,10 @@ def extract_media_urls(post_data: Dict) -> List[Dict[str, str]]:
                         }
                     )
 
-    # 3. Reddit videos
+    # 3. Reddit-hosted videos (media.reddit_video)
     if post_data.get("is_video") or post_data.get("media"):
         media = post_data.get("media") or post_data.get("secure_media")
-        if media and "reddit_video" in media:
+        if media and isinstance(media, dict) and "reddit_video" in media:
             video = media["reddit_video"]
             if "fallback_url" in video:
                 video_url = video["fallback_url"]
@@ -112,9 +112,43 @@ def extract_media_urls(post_data: Dict) -> List[Dict[str, str]]:
                     {"url": audio_url, "filename": f"{post_id}_{safe_title}_audio.mp4"}
                 )
 
-    # 4. Preview images/GIFs
+    # 4. Reddit video preview (embedded videos from redgifs, external hosts, etc.)
     preview = post_data.get("preview", {})
-    if "images" in preview and preview["images"]:
+    if isinstance(preview, dict):
+        rvp = preview.get("reddit_video_preview")
+        if rvp and isinstance(rvp, dict) and "fallback_url" in rvp:
+            video_url = rvp["fallback_url"]
+            # Only add if we haven't already captured a video from step 3
+            existing_video_urls = {m["url"] for m in media_urls}
+            if video_url not in existing_video_urls:
+                media_urls.append(
+                    {"url": video_url, "filename": f"{post_id}_{safe_title}_video.mp4"}
+                )
+
+    # 5. Crossposted videos — check parent post for video data
+    crosspost_list = post_data.get("crosspost_parent_list")
+    if crosspost_list and isinstance(crosspost_list, list):
+        for cp in crosspost_list:
+            if not isinstance(cp, dict):
+                continue
+            cp_media = cp.get("media") or cp.get("secure_media")
+            if cp_media and isinstance(cp_media, dict) and "reddit_video" in cp_media:
+                video = cp_media["reddit_video"]
+                if "fallback_url" in video:
+                    video_url = video["fallback_url"]
+                    existing_video_urls = {m["url"] for m in media_urls}
+                    if video_url not in existing_video_urls:
+                        media_urls.append(
+                            {"url": video_url, "filename": f"{post_id}_{safe_title}_video.mp4"}
+                        )
+                        base_url = video_url.rsplit("/", 1)[0]
+                        audio_url = f"{base_url}/DASH_audio.mp4"
+                        media_urls.append(
+                            {"url": audio_url, "filename": f"{post_id}_{safe_title}_audio.mp4"}
+                        )
+
+    # 6. Preview images/GIFs
+    if isinstance(preview, dict) and "images" in preview and preview["images"]:
         image_data = preview["images"][0]
 
         # Check for GIF variant first
@@ -129,20 +163,40 @@ def extract_media_urls(post_data: Dict) -> List[Dict[str, str]]:
             media_urls.append(
                 {"url": mp4_url, "filename": f"{post_id}_{safe_title}_preview.mp4"}
             )
-        # Get highest res image
+        # Get highest res image (only if we don't already have video from this post)
         elif "source" in image_data:
-            img_url = image_data["source"]["url"].replace("&amp;", "&")
-            media_urls.append(
-                {
-                    "url": img_url,
-                    "filename": f"{post_id}_{safe_title}_preview{get_file_extension(img_url)}",
-                }
+            existing_video_urls = {m["url"] for m in media_urls}
+            has_video = any(
+                get_media_type(m["filename"]) == "videos" for m in media_urls
             )
+            if not has_video:
+                img_url = image_data["source"]["url"].replace("&amp;", "&")
+                media_urls.append(
+                    {
+                        "url": img_url,
+                        "filename": f"{post_id}_{safe_title}_preview{get_file_extension(img_url)}",
+                    }
+                )
 
-    # 5. Handle gifv links (convert to mp4)
+    # 7. Handle gifv links (convert to mp4)
     if direct_url and direct_url.endswith(".gifv"):
         mp4_url = direct_url[:-5] + ".mp4"
         media_urls.append({"url": mp4_url, "filename": f"{post_id}_{safe_title}.mp4"})
+
+    # 8. Redgifs/external oembed thumbnail as last resort
+    if not media_urls:
+        media = post_data.get("media") or post_data.get("secure_media")
+        if media and isinstance(media, dict):
+            oembed = media.get("oembed")
+            if oembed and isinstance(oembed, dict):
+                thumb = oembed.get("thumbnail_url")
+                if thumb and is_media_url(thumb):
+                    media_urls.append(
+                        {
+                            "url": thumb.replace("&amp;", "&"),
+                            "filename": f"{post_id}_{safe_title}_thumb{get_file_extension(thumb)}",
+                        }
+                    )
 
     return media_urls
 
@@ -190,7 +244,9 @@ def parse_json_files(input_dir: str) -> List[Dict]:
         print(f"Input directory {input_dir} does not exist!")
         return posts
 
-    json_files = list(input_path.glob("*.json"))
+    json_files = sorted(set(
+        list(input_path.glob("*.json")) + list(input_path.glob("**/*.json"))
+    ))
     print(f"Found {len(json_files)} JSON files")
 
     for json_file in json_files:
@@ -227,7 +283,7 @@ def extract_all_media(posts: List[Dict]) -> List[Dict[str, str]]:
     """
     Extract all media URLs from a list of posts, deduplicating by URL.
 
-    Returns list of dicts with 'url' and 'filename' keys.
+    Returns list of dicts with 'url', 'filename', and 'subreddit' keys.
     """
     all_media = []
     seen_urls: Set[str] = set()
@@ -235,11 +291,13 @@ def extract_all_media(posts: List[Dict]) -> List[Dict[str, str]]:
     for post in posts:
         if post is None or not isinstance(post, dict):
             continue
+        subreddit = post.get("subreddit", "unknown")
         media_urls = extract_media_urls(post)
         for media in media_urls:
             url = media["url"]
             if url not in seen_urls:
                 seen_urls.add(url)
+                media["subreddit"] = subreddit
                 all_media.append(media)
 
     return all_media
@@ -284,7 +342,7 @@ def download_all(
     Download all media files concurrently.
 
     Args:
-        downloads: List of dicts with 'url' and 'filename' keys.
+        downloads: List of dicts with 'url', 'filename', and optionally 'subreddit' keys.
         output_dir: Base output directory (files sorted into subdirectories).
         workers: Number of parallel download threads.
 
@@ -295,15 +353,23 @@ def download_all(
     download_pairs = []
     for media in downloads:
         media_type = get_media_type(media["filename"])
-        filepath = os.path.join(output_dir, media_type, media["filename"])
+        subreddit = media.get("subreddit")
+        if subreddit:
+            filepath = os.path.join(output_dir, subreddit, media_type, media["filename"])
+        else:
+            filepath = os.path.join(output_dir, media_type, media["filename"])
         download_pairs.append((media["url"], filepath))
 
     if not download_pairs:
         return 0, 0
 
-    # Ensure subdirectories exist
-    for subdir in ["images", "videos", "gifs", "other"]:
-        Path(output_dir, subdir).mkdir(parents=True, exist_ok=True)
+    # Ensure all required directories exist
+    seen_dirs: Set[str] = set()
+    for _, filepath in download_pairs:
+        d = os.path.dirname(filepath)
+        if d not in seen_dirs:
+            seen_dirs.add(d)
+            Path(d).mkdir(parents=True, exist_ok=True)
 
     successful = 0
     failed = 0
@@ -371,12 +437,22 @@ def main():
     print(f"   ✗ Failed: {failed}")
     print(f"   📁 Files saved to: {output_dir}")
 
-    # Show file count by type
-    for subdir in ["images", "videos", "gifs"]:
-        subdir_path = Path(output_dir, subdir)
-        file_count = len(list(subdir_path.glob("*")))
-        if file_count > 0:
-            print(f"   📂 {subdir.capitalize()}: {file_count} files")
+    # Show file count by subreddit
+    subreddits_found = sorted({m.get("subreddit", "") for m in all_media} - {""})
+    if subreddits_found:
+        for sub in subreddits_found:
+            sub_path = Path(output_dir, sub)
+            if sub_path.exists():
+                total = sum(1 for f in sub_path.rglob("*") if f.is_file())
+                if total:
+                    print(f"   📂 r/{sub}: {total} files")
+    else:
+        for subdir in ["images", "videos", "gifs"]:
+            subdir_path = Path(output_dir, subdir)
+            if subdir_path.exists():
+                file_count = len(list(subdir_path.glob("*")))
+                if file_count > 0:
+                    print(f"   📂 {subdir.capitalize()}: {file_count} files")
 
 
 if __name__ == "__main__":
