@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.py$'; then cd \"$(git rev-parse --show-toplevel)\" && mkdocs build --quiet 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

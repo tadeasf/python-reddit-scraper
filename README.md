@@ -5,10 +5,13 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 ## Features
 
 - **Automated scraping**: Stealth browser (camoufox) fetches Reddit JSON API — no manual JSON saving
+- **Parallel scraping**: Multiple subreddits scraped concurrently with separate browser instances
+- **Queued downloads**: Downloads start as each subreddit finishes scraping — no waiting for all scrapes
+- **Resume support**: Interrupted downloads can be resumed with `--resume`
 - **Interactive prompt**: Enter subreddit names interactively or via CLI flags
 - **High-quality downloads**: Automatically selects highest resolution media
 - **Fast concurrent downloads**: Uses 16 parallel workers for maximum speed
-- **Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` subdirectories
+- **Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` per subreddit
 - **Media filtering**: `--video-only` or `--image-only` flags to download specific types
 - **Real-time progress**: Beautiful progress bars for both scraping and downloading
 - **Timestamped sessions**: Creates dated directories for each download session
@@ -56,6 +59,14 @@ rye run download-reddit-media -s wallpapers --video-only
 rye run download-reddit-media -s wallpapers --image-only
 ```
 
+### Resume interrupted downloads
+
+If a download is interrupted (Ctrl+C, crash, etc.), resume it:
+
+```bash
+rye run download-reddit-media --resume
+```
+
 ### Save scraped JSON for later
 
 ```bash
@@ -77,7 +88,41 @@ Options:
   --save-json              Save scraped JSON to ./input/{subreddit}/
   --max-pages INTEGER      Max pages per subreddit (default: 50 ≈ 5000 posts)
   -w, --workers INTEGER    Parallel download threads (default: 16)
+  --resume                 Resume the most recent interrupted download session
   --help                   Show this message and exit
+```
+
+## How It Works
+
+### Parallel scraping + queued downloads
+
+When scraping multiple subreddits, each gets its own browser process:
+
+```
+Scraper Process 1: r/wallpapers ──► finishes ──► download starts immediately
+Scraper Process 2: r/earthporn  ──► finishes ──► queued, downloads after wallpapers
+Scraper Process 3: r/pics       ──► finishes ──► queued, downloads after earthporn
+```
+
+### Resume support
+
+Session state is saved to `.scraper-state/` after scraping completes. If downloading is interrupted, `--resume` picks up where it left off — no re-scraping needed. State files are auto-cleaned after successful completion.
+
+## Output Structure
+
+Files are automatically organized by subreddit and media type:
+
+```bash
+downloads/
+└── 2025-01-27_14-30-45/
+    ├── wallpapers/
+    │   ├── images/
+    │   ├── videos/
+    │   └── gifs/
+    └── earthporn/
+        ├── images/
+        ├── videos/
+        └── gifs/
 ```
 
 ## Advanced: Manual JSON Workflow
@@ -101,39 +146,14 @@ Save Reddit JSON data to the `./input` directory.
 rye run download-reddit-media --from-json
 ```
 
-## Output Structure
+## Documentation
 
-Files are automatically organized in timestamped directories with type-based sorting:
+Full documentation is available at: https://tadeasf.github.io/python-reddit-scraper/
 
-```bash
-downloads/
-└── 2025-01-27_14-30-45/          # Timestamped session folder
-    ├── images/                    # JPG, PNG, WebP files
-    │   ├── 1.jpg
-    │   ├── 1xyz789.png
-    │   └── ...
-    ├── videos/                    # MP4, WebM, MOV files
-    │   ├── 1kqz723_Amazing video_video.mp4
-    │   ├── 1abc456_Reddit video_audio.mp4
-    │   └── ...
-    ├── gifs/                      # Animated GIF files
-    │   ├── 1kpgfko.gif
-    │   ├── 1def123_Funny reaction.gif
-    │   └── ...
-    └── other/                     # Any other file types
-        └── ...
-```
-
-**Final summary shows file counts:**
+To build docs locally:
 
 ```bash
-Download complete!
-   ✓ Successful: 278
-   ✗ Failed: 7
-   Files saved to: ./downloads/2025-01-27_14-30-45
-   Images: 156 files
-   Videos: 89 files
-   Gifs: 33 files
+rye run mkdocs serve
 ```
 
 ## Supported Media Types
@@ -149,6 +169,9 @@ Download complete!
 ## Technical Details
 
 - **Stealth scraping**: Camoufox (anti-detect Firefox) with automatic fingerprint rotation
+- **Parallel architecture**: ProcessPoolExecutor for scraping (each process gets own browser)
+- **Queued downloads**: Download consumer thread processes subreddits as they finish scraping
+- **Resume state**: JSON session files in `.scraper-state/` with atomic writes
 - **Smart parsing**: Handles Reddit's complex data structures (galleries, videos, previews)
 - **Rate limiting**: 1.5s delay between API pages + exponential backoff on 429s
 - **High performance**: 16 concurrent workers for optimal download speed

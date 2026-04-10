@@ -337,6 +337,7 @@ def download_all(
     downloads: List[Dict[str, str]],
     output_dir: str,
     workers: int = 16,
+    on_file_done=None,
 ) -> tuple[int, int]:
     """
     Download all media files concurrently.
@@ -345,6 +346,8 @@ def download_all(
         downloads: List of dicts with 'url', 'filename', and optionally 'subreddit' keys.
         output_dir: Base output directory (files sorted into subdirectories).
         workers: Number of parallel download threads.
+        on_file_done: Optional callback ``(url: str) -> None`` called after each
+            successful download (used for resume state tracking).
 
     Returns:
         Tuple of (successful_count, failed_count).
@@ -387,9 +390,12 @@ def download_all(
             for url, filepath in download_pairs
         }
         for future in as_completed(future_to_download):
+            url, filepath = future_to_download[future]
             success = future.result()
             if success:
                 successful += 1
+                if on_file_done:
+                    on_file_done(url)
             else:
                 failed += 1
             pbar.update(1)

@@ -19,7 +19,10 @@ build-backend = "pdm.backend"
 
 [tool.rye]
 managed = true
-dev-dependencies = []
+dev-dependencies = [
+    "mkdocs-material>=9.6.0",
+    "mkdocstrings[python]>=0.27.0",
+]
 
 [project.scripts]
 download-reddit-media = "python_reddit_scraper.cli:app"
