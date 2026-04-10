@@ -81,6 +81,14 @@ def download(
         int,
         typer.Option("--workers", "-w", help="Number of parallel download threads."),
     ] = 16,
+    scrape_workers: Annotated[
+        int,
+        typer.Option(
+            "--scrape-workers",
+            "-sw",
+            help="Max parallel camoufox scraper processes (default: cpu_count // 2).",
+        ),
+    ] = max(1, (os.cpu_count() or 2) // 2),
     resume: Annotated[
         bool,
         typer.Option("--resume", help="Resume the most recent interrupted download session."),
@@ -161,7 +169,7 @@ def download(
         scrape_parallel(
             sub_list,
             max_pages=max_pages,
-            max_workers=min(len(sub_list), 4),
+            max_workers=min(len(sub_list), scrape_workers),
             on_complete=on_sub_complete,
             progress=progress,
         )
@@ -224,7 +232,7 @@ def _handle_resume(workers: int) -> None:
             scrape_parallel(
                 pending_subs,
                 max_pages=50,
-                max_workers=min(len(pending_subs), 4),
+                max_workers=min(len(pending_subs), max(1, (os.cpu_count() or 2) // 2)),
                 on_complete=on_sub_complete,
             )
         except Exception as exc:

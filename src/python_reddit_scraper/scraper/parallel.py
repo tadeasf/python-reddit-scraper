@@ -70,11 +70,10 @@ def scrape_parallel(
     quiet = progress is not None
 
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        future_to_sub = {
-            executor.submit(scrape_worker, sub, max_pages, delay, quiet=quiet): sub
-            for sub in subreddits
-        }
+        future_to_sub: dict = {}
         for sub in subreddits:
+            future = executor.submit(scrape_worker, sub, max_pages, delay, quiet=quiet)
+            future_to_sub[future] = sub
             if progress:
                 progress.mark_scrape_started(sub)
 

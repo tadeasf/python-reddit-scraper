@@ -3,7 +3,7 @@
 from loguru import logger
 from rich.console import Console
 
-_console = Console(stderr=True)
+_console = Console()
 
 log_console = _console
 

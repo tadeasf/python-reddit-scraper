@@ -110,7 +110,7 @@ def _fetch_json_page(
     """
     for attempt in range(max_retries):
         try:
-            response = page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
             if response is None:
                 return None

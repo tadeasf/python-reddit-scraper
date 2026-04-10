@@ -2,7 +2,6 @@
 
 import threading
 
-from rich.console import Console
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -12,7 +11,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-console = Console()
+from python_reddit_scraper.log import log_console as console
 
 
 class ProgressDisplay:
@@ -31,6 +30,7 @@ class ProgressDisplay:
         self._lock = threading.Lock()
         self._active_subs: set[str] = set()
         self._total_subs = total_subs
+        self._download_total: int = 0
 
         self._progress = Progress(
             SpinnerColumn(),
@@ -90,20 +90,23 @@ class ProgressDisplay:
             )
 
     def _scrape_status(self) -> str:
-        if not self._active_subs:
+        n = len(self._active_subs)
+        if n == 0:
             return "idle"
-        names = ", ".join(f"r/{s}" for s in sorted(self._active_subs))
-        return f"active: {names}"
+        if n == 1:
+            sub = next(iter(self._active_subs))
+            return f"active: r/{sub}"
+        return f"active: {n} subreddits"
 
     # -- downloading --
 
     def init_download(self, total_files: int, sub: str, queued: int) -> None:
-        """Set (or add to) total files and update the current subreddit label."""
+        """Add to total files and update the current subreddit label."""
         with self._lock:
-            current_total = self._progress.tasks[self._download_task.id].total or 0
+            self._download_total += total_files
             self._progress.update(
                 self._download_task,
-                total=current_total + total_files,
+                total=self._download_total,
                 status=self._download_status(sub, queued),
             )
 
