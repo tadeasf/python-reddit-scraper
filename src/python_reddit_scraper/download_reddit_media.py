@@ -223,6 +223,115 @@ def parse_json_files(input_dir: str) -> List[Dict]:
     return posts
 
 
+def extract_all_media(posts: List[Dict]) -> List[Dict[str, str]]:
+    """
+    Extract all media URLs from a list of posts, deduplicating by URL.
+
+    Returns list of dicts with 'url' and 'filename' keys.
+    """
+    all_media = []
+    seen_urls: Set[str] = set()
+
+    for post in posts:
+        if post is None or not isinstance(post, dict):
+            continue
+        media_urls = extract_media_urls(post)
+        for media in media_urls:
+            url = media["url"]
+            if url not in seen_urls:
+                seen_urls.add(url)
+                all_media.append(media)
+
+    return all_media
+
+
+def filter_by_media_type(
+    downloads: List[Dict[str, str]],
+    video_only: bool = False,
+    image_only: bool = False,
+) -> List[Dict[str, str]]:
+    """
+    Filter media list by type.
+
+    Args:
+        downloads: List of dicts with 'url' and 'filename' keys.
+        video_only: Keep only videos + gifs (animations).
+        image_only: Keep only images.
+
+    Returns:
+        Filtered list.
+    """
+    if not video_only and not image_only:
+        return downloads
+
+    filtered = []
+    for item in downloads:
+        media_type = get_media_type(item["filename"])
+        if video_only and media_type in ("videos", "gifs"):
+            filtered.append(item)
+        elif image_only and media_type == "images":
+            filtered.append(item)
+
+    return filtered
+
+
+def download_all(
+    downloads: List[Dict[str, str]],
+    output_dir: str,
+    workers: int = 16,
+) -> tuple[int, int]:
+    """
+    Download all media files concurrently.
+
+    Args:
+        downloads: List of dicts with 'url' and 'filename' keys.
+        output_dir: Base output directory (files sorted into subdirectories).
+        workers: Number of parallel download threads.
+
+    Returns:
+        Tuple of (successful_count, failed_count).
+    """
+    # Prepare (url, filepath) pairs sorted into subdirectories
+    download_pairs = []
+    for media in downloads:
+        media_type = get_media_type(media["filename"])
+        filepath = os.path.join(output_dir, media_type, media["filename"])
+        download_pairs.append((media["url"], filepath))
+
+    if not download_pairs:
+        return 0, 0
+
+    # Ensure subdirectories exist
+    for subdir in ["images", "videos", "gifs", "other"]:
+        Path(output_dir, subdir).mkdir(parents=True, exist_ok=True)
+
+    successful = 0
+    failed = 0
+
+    pbar = tqdm(
+        total=len(download_pairs),
+        desc="Downloading",
+        unit="files",
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
+    )
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_download = {
+            executor.submit(download_file, url, filepath, pbar): (url, filepath)
+            for url, filepath in download_pairs
+        }
+        for future in as_completed(future_to_download):
+            success = future.result()
+            if success:
+                successful += 1
+            else:
+                failed += 1
+            pbar.update(1)
+
+    pbar.close()
+    return successful, failed
+
+
 def main():
     """Main function to parse JSON files and download media."""
     input_dir = "./input"
@@ -232,10 +341,6 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = os.path.join(base_output_dir, timestamp)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    # Create subdirectories
-    for subdir in ["images", "videos", "gifs", "other"]:
-        Path(output_dir, subdir).mkdir(exist_ok=True)
 
     print("🚀 Starting Reddit media downloader...")
     print(f"📁 Output directory: {output_dir}")
@@ -249,61 +354,17 @@ def main():
         return
 
     # Extract all media URLs
-    all_downloads = []
-    seen_urls = set()
-
     print("🔍 Extracting media URLs...")
-    for post in posts:
-        # Skip None or invalid posts
-        if post is None or not isinstance(post, dict):
-            continue
-        media_urls = extract_media_urls(post)
-        for media in media_urls:
-            url = media["url"]
-            if url not in seen_urls:
-                seen_urls.add(url)
-                # Sort into appropriate subdirectory
-                media_type = get_media_type(media["filename"])
-                filepath = os.path.join(output_dir, media_type, media["filename"])
-                all_downloads.append((url, filepath))
+    all_media = extract_all_media(posts)
+    print(f"Found {len(all_media)} unique media files to download")
 
-    print(f"Found {len(all_downloads)} unique media files to download")
-
-    if not all_downloads:
+    if not all_media:
         print("No media URLs found to download")
         return
 
-    # Download files concurrently with 16 workers
+    # Download files
     print("📥 Starting downloads with 16 parallel workers...")
-
-    successful = 0
-    failed = 0
-
-    # Create progress bar
-    pbar = tqdm(
-        total=len(all_downloads),
-        desc="Downloading",
-        unit="files",
-        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
-    )
-
-    with ThreadPoolExecutor(max_workers=16) as executor:
-        # Submit all download tasks
-        future_to_download = {
-            executor.submit(download_file, url, filepath, pbar): (url, filepath)
-            for url, filepath in all_downloads
-        }
-
-        # Process completed downloads
-        for future in as_completed(future_to_download):
-            success = future.result()
-            if success:
-                successful += 1
-            else:
-                failed += 1
-            pbar.update(1)
-
-    pbar.close()
+    successful, failed = download_all(all_media, output_dir)
 
     print(f"\n🎉 Download complete!")
     print(f"   ✓ Successful: {successful}")

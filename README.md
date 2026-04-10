@@ -1,16 +1,19 @@
 # Reddit Media Downloader
 
-A fast and organized Python script that parses saved Reddit JSON files and downloads all media (images, videos, GIFs) at the highest available resolution with real-time progress tracking.
+A fast Python tool that scrapes Reddit subreddits using a stealth browser and downloads all media (images, videos, GIFs) at the highest available resolution with real-time progress tracking.
 
 ## Features
 
-- ** High-quality downloads**: Automatically selects highest resolution media
+- **Automated scraping**: Stealth browser (camoufox) fetches Reddit JSON API — no manual JSON saving
+- **Interactive prompt**: Enter subreddit names interactively or via CLI flags
+- **High-quality downloads**: Automatically selects highest resolution media
 - **Fast concurrent downloads**: Uses 16 parallel workers for maximum speed
 - **Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` subdirectories
-- **Real-time progress**: Beautiful progress bar with download rate and time estimation
+- **Media filtering**: `--video-only` or `--image-only` flags to download specific types
+- **Real-time progress**: Beautiful progress bars for both scraping and downloading
 - **Timestamped sessions**: Creates dated directories for each download session
 - **Deduplication**: Avoids downloading the same file twice
-- **Clean dependencies**: Minimal setup with only `tqdm` required
+- **JSON caching**: `--save-json` to cache scraped data for later reuse
 
 ## Installation
 
@@ -20,7 +23,66 @@ Install dependencies using Rye:
 rye sync
 ```
 
-## 📖 Usage
+Then download the stealth Firefox binary (one-time setup, ~80 MB):
+
+```bash
+camoufox fetch
+```
+
+## Quick Start
+
+### Automated scraping (recommended)
+
+Run the tool and enter subreddit names when prompted:
+
+```bash
+rye run download-reddit-media
+# Enter subreddits (comma-separated): buildapc,dataengineering
+```
+
+Or pass subreddits directly:
+
+```bash
+rye run download-reddit-media --subreddits buildapc,dataengineering
+```
+
+### Download only videos or images
+
+```bash
+# Videos and GIFs only
+rye run download-reddit-media -s wallpapers --video-only
+
+# Images only
+rye run download-reddit-media -s wallpapers --image-only
+```
+
+### Save scraped JSON for later
+
+```bash
+# Scrape and save JSON + download
+rye run download-reddit-media -s buildapc --save-json
+
+# Re-download from saved JSON (no browser needed)
+rye run download-reddit-media --from-json
+```
+
+### All options
+
+```
+Options:
+  -s, --subreddits TEXT    Comma-separated subreddit names
+  --video-only             Download only videos and GIFs/animations
+  --image-only             Download only images
+  --from-json              Use existing JSON files in ./input/ instead of scraping
+  --save-json              Save scraped JSON to ./input/{subreddit}/
+  --max-pages INTEGER      Max pages per subreddit (default: 50 ≈ 5000 posts)
+  -w, --workers INTEGER    Parallel download threads (default: 16)
+  --help                   Show this message and exit
+```
+
+## Advanced: Manual JSON Workflow
+
+You can still use the original manual workflow:
 
 ### 1. Prepare JSON files
 
@@ -33,32 +95,10 @@ Save Reddit JSON data to the `./input` directory.
 - **Page 2**: `https://old.reddit.com/r/subreddit.json?limit=100&raw_json=1&after=t3_abc123` → Save as `./input/2.json`
 - **Continue**: Repeat until `data.after` is null (end of subreddit)
 
-### 2. Run the downloader
-
-**Direct execution:**
+### 2. Run from saved JSON
 
 ```bash
-python src/python_reddit_scraper/download_reddit_media.py
-```
-
-**Or using the installed script:**
-
-```bash
-rye run download-reddit-media
-```
-
-### 3. Watch the magic happen! ✨
-
-The script will show a beautiful progress bar with real-time stats:
-
-```bash
-Starting Reddit media downloader...
-Output directory: ./downloads/2025-01-27_14-30-45
-Found 150 posts to process
-Extracting media URLs...
-Found 285 unique media files to download
-Starting downloads with 16 parallel workers...
-Downloading: 100%|██████████| 285/285 [02:45<00:00, 1.72files/s] Downloaded: amazing_video.mp4
+rye run download-reddit-media --from-json
 ```
 
 ## Output Structure
@@ -108,8 +148,9 @@ Download complete!
 
 ## Technical Details
 
-- **Minimal dependencies**: Python standard library + `tqdm` only
+- **Stealth scraping**: Camoufox (anti-detect Firefox) with automatic fingerprint rotation
 - **Smart parsing**: Handles Reddit's complex data structures (galleries, videos, previews)
+- **Rate limiting**: 1.5s delay between API pages + exponential backoff on 429s
 - **High performance**: 16 concurrent workers for optimal download speed
 - **Cross-platform**: Sanitizes filenames for Windows/Mac/Linux compatibility
 - **Anti-blocking**: Proper HTTP headers and user agent rotation

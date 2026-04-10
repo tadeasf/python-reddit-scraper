@@ -10,5 +10,73 @@
 #   universal: false
 
 -e file:.
-tqdm==4.67.1
+annotated-doc==0.0.4
+    # via typer
+apify-fingerprint-datapoints==0.12.0
+    # via browserforge
+browserforge==1.2.4
+    # via camoufox
+camoufox==0.4.11
     # via python-reddit-scraper
+certifi==2026.2.25
+    # via requests
+charset-normalizer==3.4.7
+    # via requests
+click==8.3.2
+    # via browserforge
+    # via camoufox
+    # via typer
+greenlet==3.4.0
+    # via playwright
+idna==3.11
+    # via requests
+language-tags==1.2.0
+    # via camoufox
+lxml==6.0.3
+    # via camoufox
+markdown-it-py==4.0.0
+    # via rich
+mdurl==0.1.2
+    # via markdown-it-py
+numpy==2.4.4
+    # via camoufox
+orjson==3.11.8
+    # via camoufox
+platformdirs==4.9.6
+    # via camoufox
+playwright==1.58.0
+    # via camoufox
+prompt-toolkit==3.0.52
+    # via python-reddit-scraper
+pyee==13.0.1
+    # via playwright
+pygments==2.20.0
+    # via rich
+pysocks==1.7.1
+    # via camoufox
+pyyaml==6.0.3
+    # via camoufox
+requests==2.33.1
+    # via camoufox
+rich==14.3.3
+    # via typer
+screeninfo==0.8.1
+    # via camoufox
+shellingham==1.5.4
+    # via typer
+tqdm==4.67.1
+    # via camoufox
+    # via python-reddit-scraper
+typer==0.24.1
+    # via python-reddit-scraper
+typing-extensions==4.15.0
+    # via camoufox
+    # via pyee
+ua-parser==1.0.2
+    # via camoufox
+ua-parser-builtins==202603
+    # via ua-parser
+urllib3==2.6.3
+    # via requests
+wcwidth==0.6.0
+    # via prompt-toolkit
