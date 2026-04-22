@@ -11,9 +11,15 @@ _CONFIG_PATH = Path.home() / ".config" / "python_reddit_scraper" / "config.yaml"
 
 
 @dataclass(frozen=True)
-class WebshareAccount:
-    email: str
-    api_key: str
+class Provider:
+    """One proxy provider block from the config file.
+
+    ``accounts`` holds the provider-specific raw dicts (shape differs per
+    provider — see ``scraper.proxy_handler`` for how each is parsed).
+    """
+
+    name: str
+    accounts: list[dict]
 
 
 def load_config() -> dict:
@@ -23,17 +29,10 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def get_webshare_accounts() -> list[WebshareAccount]:
-    """Return all configured Webshare accounts in order.
-
-    Reads ``providers[].accounts[]`` entries where ``name == "webshare"`` from
-    the YAML config file.
-    """
+def get_providers() -> list[Provider]:
+    """Return all configured proxy providers in the order they appear in YAML."""
     cfg = load_config()
-    for provider in cfg.get("providers") or []:
-        if provider.get("name") == "webshare":
-            return [
-                WebshareAccount(email=a["email"], api_key=a["api_key"])
-                for a in provider.get("accounts") or []
-            ]
-    return []
+    return [
+        Provider(name=p["name"], accounts=list(p.get("accounts") or []))
+        for p in (cfg.get("providers") or [])
+    ]

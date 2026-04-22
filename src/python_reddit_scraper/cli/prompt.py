@@ -1,7 +1,38 @@
 """Interactive prompts and environment checks for the CLI."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import typer
 from loguru import logger
+
+if TYPE_CHECKING:
+    from python_reddit_scraper.config import Provider
+
+
+def choose_provider(providers: list[Provider]) -> Provider:
+    """Return the single provider, or prompt the user to pick when there are several."""
+    if len(providers) == 1:
+        return providers[0]
+
+    from prompt_toolkit import prompt
+
+    print("Available proxy providers:")
+    for i, p in enumerate(providers, 1):
+        suffix = "s" if len(p.accounts) != 1 else ""
+        print(f"  {i}) {p.name} ({len(p.accounts)} account{suffix})")
+
+    while True:
+        raw = prompt(f"Choose [1-{len(providers)}]: ").strip()
+        try:
+            idx = int(raw)
+        except ValueError:
+            logger.warning("Enter a number between 1 and {}.", len(providers))
+            continue
+        if 1 <= idx <= len(providers):
+            return providers[idx - 1]
+        logger.warning("Out of range. Enter a number between 1 and {}.", len(providers))
 
 
 def prompt_subreddits() -> list[str]:
