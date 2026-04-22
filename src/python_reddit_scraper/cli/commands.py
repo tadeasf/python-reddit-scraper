@@ -73,6 +73,13 @@ def download(
         bool,
         typer.Option("--resume", help="Resume the most recent interrupted download session."),
     ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Scrape and list what would be downloaded; do not write any files.",
+        ),
+    ] = False,
     version: Annotated[
         bool,
         typer.Option(
@@ -100,4 +107,5 @@ def download(
         max_pages=max_pages,
         workers=workers,
         scrape_workers=scrape_workers,
+        dry_run=dry_run,
     )
