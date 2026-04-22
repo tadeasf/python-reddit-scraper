@@ -8,9 +8,19 @@ from pathlib import Path
 import yaml
 from loguru import logger
 
+from python_reddit_scraper.constants import ALL_MEDIA_TYPES
+
 _CONFIG_PATH = Path.home() / ".config" / "python_reddit_scraper" / "config.yaml"
 
-ALL_MEDIA_TYPES: frozenset[str] = frozenset({"images", "videos", "gifs"})
+__all__ = [
+    "ALL_MEDIA_TYPES",
+    "Defaults",
+    "Provider",
+    "get_defaults",
+    "get_providers",
+    "load_config",
+    "save_defaults",
+]
 
 
 @dataclass(frozen=True)
