@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from loguru import logger
 
-from python_reddit_scraper.config import Defaults, get_defaults, save_defaults
-from python_reddit_scraper.constants import ALL_MEDIA_TYPES
-from python_reddit_scraper.ui.prompts import (
+from python_reddit_scraper.cli.prompt import (
     prompt_max_pages,
     prompt_media_types,
     prompt_output_dir,
     prompt_scrape_workers,
     prompt_workers,
 )
+from python_reddit_scraper.config import ALL_MEDIA_TYPES, Defaults, get_defaults, save_defaults
 
 
 def configure() -> None:
