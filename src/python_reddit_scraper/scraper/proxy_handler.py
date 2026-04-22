@@ -112,10 +112,18 @@ def _load_webshare(accounts: list[dict]) -> list[dict]:
     return fetch_proxies_with_fallback(parsed)
 
 
+_PROXY_CHEAP_PROTOCOLS = {"http", "https", "socks5"}
+
+
 def _load_proxy_cheap(accounts: list[dict]) -> list[dict]:
     """Materialize proxy-cheap accounts into Camoufox-ready proxy dicts.
 
     Each account is already a single proxy endpoint (no API call needed).
+    The optional ``protocol`` field selects the URL scheme (``http``, ``https``,
+    or ``socks5``); it defaults to ``http``. Camoufox forwards the dict to
+    Playwright, which accepts ``server`` URLs with any of those schemes and
+    honours ``username`` / ``password`` for both HTTP-Basic and SOCKS5 auth.
+
     Returns the full list so workers can distribute them round-robin.
     """
     if not accounts:
@@ -123,15 +131,27 @@ def _load_proxy_cheap(accounts: list[dict]) -> list[dict]:
 
     proxies: list[dict] = []
     for acct in accounts:
+        protocol = str(acct.get("protocol") or "http").lower()
+        if protocol not in _PROXY_CHEAP_PROTOCOLS:
+            logger.warning(
+                "proxy-cheap {}:{}: unknown protocol {!r}, falling back to http. "
+                "Valid values: {}.",
+                acct["ip_address"],
+                acct["port"],
+                protocol,
+                ", ".join(sorted(_PROXY_CHEAP_PROTOCOLS)),
+            )
+            protocol = "http"
+
         label = f"{acct['ip_address']}:{acct['port']}"
         proxies.append(
             {
-                "server": f"http://{label}",
+                "server": f"{protocol}://{label}",
                 "username": acct["username"],
                 "password": acct["password"],
             }
         )
-        logger.info("proxy-cheap {}: loaded", label)
+        logger.info("proxy-cheap {} ({}): loaded", label, protocol)
     return proxies
 
 

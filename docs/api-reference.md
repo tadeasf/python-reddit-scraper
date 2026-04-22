@@ -71,11 +71,29 @@ The CLI commands module provides the main download command.
       show_root_heading: true
       members_order: source
 
+### Configure
+
+Interactive subcommand that writes user defaults to `config.yaml`.
+
+::: python_reddit_scraper.cli.configure
+    options:
+      show_root_heading: true
+      members_order: source
+
 ### Prompt
 
 Interactive prompts and environment checks.
 
 ::: python_reddit_scraper.cli.prompt
+    options:
+      show_root_heading: true
+      members_order: source
+
+## Config
+
+User configuration loader — defaults, proxy providers, and YAML read/write.
+
+::: python_reddit_scraper.config
     options:
       show_root_heading: true
       members_order: source
