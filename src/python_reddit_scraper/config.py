@@ -16,5 +16,17 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def get_webshare_api_key() -> str | None:
-    return load_config().get("api_key")
+def get_webshare_api_keys() -> list[str]:
+    """Return all configured Webshare API keys in order.
+
+    Reads ``api_key``, ``api_key2``, ``api_key3``, ... from the config file.
+    """
+    cfg = load_config()
+    keys: list[str] = []
+    if v := cfg.get("api_key"):
+        keys.append(v)
+    i = 2
+    while v := cfg.get(f"api_key{i}"):
+        keys.append(v)
+        i += 1
+    return keys
