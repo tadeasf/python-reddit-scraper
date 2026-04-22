@@ -19,7 +19,7 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 - **Timestamped sessions**: Creates dated directories for each download session
 - **Deduplication**: Avoids downloading the same file twice
 - **JSON caching**: `--save-json` to cache scraped data for later reuse
-- **Multi-provider proxies**: Webshare (rotating via API) and proxy-cheap (static, HTTP/HTTPS/SOCKS5) with per-account fallback
+- **Multi-provider proxies**: Webshare (rotating via API) and proxy-cheap (static HTTP) with per-account fallback
 
 ## Installation
 
@@ -164,13 +164,12 @@ providers:
         password: <pass>
         ip_address: 178.93.44.23
         port: 46271
-        protocol: http          # http (default) | https | socks5
 ```
 
 ### Proxy notes
 
 - **webshare** accounts are refreshed via the Webshare API on every run.
-- **proxy-cheap** accounts are static endpoints and the `protocol` field is optional; if omitted it defaults to `http`. Valid values are `http`, `https`, and `socks5` — Camoufox / Playwright honours authenticated SOCKS5 via the same `username` / `password` fields.
+- **proxy-cheap** accounts are static HTTP endpoints. Authenticated SOCKS5 is **not** supported — Camoufox is built on Playwright's Firefox, which cannot pass credentials for SOCKS5 proxies (`Browser does not support socks5 proxy authentication`). Request an HTTP endpoint from your proxy-cheap dashboard.
 - If every account for the chosen provider has exhausted its bandwidth, the tool exits with a clear error rather than silently scraping direct.
 
 ## How It Works

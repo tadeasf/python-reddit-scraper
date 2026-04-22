@@ -137,7 +137,6 @@ providers:
         password: <pass>
         ip_address: 178.93.44.23
         port: 46271
-        protocol: http          # http (default) | https | socks5
 ```
 
 !!! tip
@@ -146,7 +145,7 @@ providers:
 ### Proxy providers
 
 - **webshare** — rotating proxies fetched via API on every run. Multiple accounts are tried in order; empty/invalid accounts are skipped.
-- **proxy-cheap** — static endpoints. `protocol` selects the URL scheme (`http`, `https`, or `socks5`); it defaults to `http`. Authenticated SOCKS5 works because Camoufox / Playwright honours `username` + `password` regardless of scheme.
+- **proxy-cheap** — static HTTP endpoints. **SOCKS5 is not supported**: Camoufox is built on Playwright's Firefox, which cannot authenticate against SOCKS5 proxies (`Browser does not support socks5 proxy authentication`). Request an HTTP endpoint from your proxy-cheap dashboard.
 
 ## Next Steps
 

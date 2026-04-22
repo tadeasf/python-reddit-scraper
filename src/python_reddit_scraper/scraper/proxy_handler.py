@@ -112,17 +112,15 @@ def _load_webshare(accounts: list[dict]) -> list[dict]:
     return fetch_proxies_with_fallback(parsed)
 
 
-_PROXY_CHEAP_PROTOCOLS = {"http", "https", "socks5"}
-
-
 def _load_proxy_cheap(accounts: list[dict]) -> list[dict]:
     """Materialize proxy-cheap accounts into Camoufox-ready proxy dicts.
 
     Each account is already a single proxy endpoint (no API call needed).
-    The optional ``protocol`` field selects the URL scheme (``http``, ``https``,
-    or ``socks5``); it defaults to ``http``. Camoufox forwards the dict to
-    Playwright, which accepts ``server`` URLs with any of those schemes and
-    honours ``username`` / ``password`` for both HTTP-Basic and SOCKS5 auth.
+    Only HTTP proxies are supported — Camoufox is built on Playwright's
+    Firefox, which does not support authenticated SOCKS5 proxies
+    (Playwright raises ``Browser does not support socks5 proxy authentication``
+    on launch). A leftover ``protocol`` field in the config is ignored with a
+    warning so existing setups keep working while the user updates their YAML.
 
     Returns the full list so workers can distribute them round-robin.
     """
@@ -131,27 +129,26 @@ def _load_proxy_cheap(accounts: list[dict]) -> list[dict]:
 
     proxies: list[dict] = []
     for acct in accounts:
-        protocol = str(acct.get("protocol") or "http").lower()
-        if protocol not in _PROXY_CHEAP_PROTOCOLS:
+        protocol = acct.get("protocol")
+        if protocol is not None and str(protocol).lower() != "http":
             logger.warning(
-                "proxy-cheap {}:{}: unknown protocol {!r}, falling back to http. "
-                "Valid values: {}.",
+                "proxy-cheap {}:{}: `protocol: {}` is ignored — only HTTP is "
+                "supported (Camoufox/Firefox cannot authenticate SOCKS5). "
+                "Using HTTP.",
                 acct["ip_address"],
                 acct["port"],
                 protocol,
-                ", ".join(sorted(_PROXY_CHEAP_PROTOCOLS)),
             )
-            protocol = "http"
 
         label = f"{acct['ip_address']}:{acct['port']}"
         proxies.append(
             {
-                "server": f"{protocol}://{label}",
+                "server": f"http://{label}",
                 "username": acct["username"],
                 "password": acct["password"],
             }
         )
-        logger.info("proxy-cheap {} ({}): loaded", label, protocol)
+        logger.info("proxy-cheap {}: loaded", label)
     return proxies
 
 

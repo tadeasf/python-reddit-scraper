@@ -14,7 +14,7 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 - **Smart organization** — Files sorted into `images/`, `videos/`, `gifs/` per subreddit
 - **Granular media filtering** — Any subset of `images` / `videos` / `gifs`, or the legacy `--video-only` / `--image-only` shortcuts
 - **JSON caching** — `--save-json` to cache scraped data for later reuse
-- **Multi-provider proxies** — Webshare (rotating via API) and proxy-cheap (HTTP/HTTPS/SOCKS5) with per-account fallback
+- **Multi-provider proxies** — Webshare (rotating via API) and proxy-cheap (static HTTP) with per-account fallback
 
 ## Quick Example
 
