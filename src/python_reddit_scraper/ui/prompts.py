@@ -1,4 +1,11 @@
-"""Interactive prompts and environment checks for the CLI."""
+"""Interactive prompts built on prompt_toolkit.
+
+PR 1 keeps the plain-text surface unchanged — styling, completers, and
+validators land in PR 2. Only two structural changes here:
+
+1. prompt_toolkit imports are hoisted to module scope (it is a required dep).
+2. The numeric prompts now share a single ``_prompt_positive_int`` helper.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +15,10 @@ from typing import TYPE_CHECKING
 
 import typer
 from loguru import logger
+from prompt_toolkit import prompt
+from prompt_toolkit.shortcuts import checkboxlist_dialog
 
-from python_reddit_scraper.config import ALL_MEDIA_TYPES
+from python_reddit_scraper.constants import ALL_MEDIA_TYPES
 
 if TYPE_CHECKING:
     from python_reddit_scraper.config import Provider
@@ -32,8 +41,6 @@ def choose_provider(providers: list[Provider]) -> Provider:
     if len(providers) == 1:
         return providers[0]
 
-    from prompt_toolkit import prompt
-
     print("Available proxy providers:")
     for i, p in enumerate(providers, 1):
         suffix = "s" if len(p.accounts) != 1 else ""
@@ -54,8 +61,6 @@ def choose_provider(providers: list[Provider]) -> Provider:
 def prompt_subreddits() -> list[str]:
     """Interactively prompt for subreddit names using prompt-toolkit."""
     _require_tty("subreddits")
-    from prompt_toolkit import prompt
-
     raw = prompt("Enter subreddits (comma-separated): ")
     subs = [s.strip().lstrip("r/") for s in raw.split(",") if s.strip()]
     if not subs:
@@ -70,8 +75,6 @@ def prompt_media_types(default: set[str] | frozenset[str] | None = None) -> froz
     Cancelling the dialog or confirming with nothing selected exits with code 1.
     """
     _require_tty("media types")
-    from prompt_toolkit.shortcuts import checkboxlist_dialog
-
     preselected = list(default) if default else list(ALL_MEDIA_TYPES)
     values = [
         ("images", "Images (.jpg/.jpeg/.png/.webp)"),
@@ -93,24 +96,19 @@ def prompt_media_types(default: set[str] | frozenset[str] | None = None) -> froz
 def prompt_output_dir(default: str) -> str:
     """Prompt for an output directory; empty input returns *default*."""
     _require_tty("output directory")
-    from prompt_toolkit import prompt
-
     raw = prompt(f"Output directory [{default}]: ").strip()
     return os.path.expanduser(raw) if raw else default
 
 
 def prompt_max_pages(default: int) -> int:
-    """Prompt for max pages (positive int); empty input returns *default*."""
     return _prompt_positive_int("Max pages per subreddit", default, "max pages")
 
 
 def prompt_workers(default: int) -> int:
-    """Prompt for number of parallel download threads; empty input returns *default*."""
     return _prompt_positive_int("Parallel download threads", default, "download workers")
 
 
 def prompt_scrape_workers(default: int) -> int:
-    """Prompt for number of parallel camoufox scraper processes; empty input returns *default*."""
     return _prompt_positive_int(
         "Parallel scraper processes (1 = sequential)", default, "scrape workers"
     )
@@ -118,8 +116,6 @@ def prompt_scrape_workers(default: int) -> int:
 
 def _prompt_positive_int(label: str, default: int, what: str) -> int:
     _require_tty(what)
-    from prompt_toolkit import prompt
-
     while True:
         raw = prompt(f"{label} [{default}]: ").strip()
         if not raw:
@@ -133,20 +129,3 @@ def _prompt_positive_int(label: str, default: int, what: str) -> int:
             logger.warning("Must be greater than zero.")
             continue
         return val
-
-
-def check_camoufox_binary() -> None:
-    """Check if the camoufox Firefox binary is installed."""
-    try:
-        from camoufox.pkgman import installed_verstr
-
-        ver = installed_verstr()
-        if not ver:
-            raise FileNotFoundError
-    except Exception:
-        logger.error(
-            "Camoufox browser not found. Run this command first:\n\n"
-            "    rye run camoufox fetch\n\n"
-            "This downloads the stealth Firefox binary (~80 MB, one-time setup)."
-        )
-        raise typer.Exit(1) from None

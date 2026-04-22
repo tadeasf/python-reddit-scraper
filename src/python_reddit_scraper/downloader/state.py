@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from python_reddit_scraper.config import ALL_MEDIA_TYPES
+from python_reddit_scraper.constants import ALL_MEDIA_TYPES
 
 STATE_DIR = ".scraper-state"
 
