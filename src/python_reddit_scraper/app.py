@@ -25,9 +25,7 @@ def main() -> None:
     """CLI dispatch.
 
     ``download-reddit-media configure`` runs the defaults-setup helper;
-    everything else (including bare invocation and the old flag-driven
-    calls like ``-s buildapc --video-only``) routes to ``download`` so
-    the legacy UX keeps working unchanged.
+    everything else (including bare invocation) routes to ``download``.
     """
     if len(sys.argv) >= 2 and sys.argv[1] == "configure":
         sys.argv.pop(1)

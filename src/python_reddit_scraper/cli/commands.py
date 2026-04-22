@@ -1,12 +1,12 @@
 """
 CLI commands for the Reddit media downloader.
 
-Handles the main download command and its sub-modes (live scrape, resume, from-json).
+Handles the main download command and its sub-modes (live scrape, resume).
 """
 
-import os
 import queue
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
@@ -23,33 +23,33 @@ from python_reddit_scraper.cli.prompt import (
 from python_reddit_scraper.config import ALL_MEDIA_TYPES, get_defaults
 from python_reddit_scraper.downloader.engine import download_all, run_download_queue
 from python_reddit_scraper.downloader.media import extract_all_media, filter_by_media_type
-from python_reddit_scraper.scraper.json_io import parse_json_files
 
 DEFAULT_OUTPUT_DIR = "./redditdownloads"
 DEFAULT_MAX_PAGES = 50
+DEFAULT_WORKERS = 16
+DEFAULT_SCRAPE_WORKERS = 1
+
+
+@dataclass(frozen=True)
+class ResolvedOptions:
+    media_types: frozenset[str]
+    output_dir: str
+    max_pages: int
+    workers: int
+    scrape_workers: int
 
 
 def _resolve_options(
-    video_only: bool,
-    image_only: bool,
     output_dir: str | None,
     max_pages: int | None,
-    *,
-    need_max_pages: bool = True,
-) -> tuple[frozenset[str], str, int | None]:
-    """Apply the CLI → config → prompt ladder for user-tunable options.
-
-    Returns the resolved ``(media_types, output_dir, max_pages)`` triple.
-    ``max_pages`` is ``None`` when ``need_max_pages=False`` (from-json mode).
-    """
+    workers: int | None,
+    scrape_workers: int | None,
+) -> ResolvedOptions:
+    """Apply the CLI → config → prompt-or-default ladder for user-tunable options."""
     defaults = get_defaults()
 
-    if video_only:
-        media_types: frozenset[str] = frozenset({"videos", "gifs"})
-    elif image_only:
-        media_types = frozenset({"images"})
-    elif defaults.media_types is not None:
-        media_types = frozenset(defaults.media_types)
+    if defaults.media_types is not None:
+        media_types: frozenset[str] = frozenset(defaults.media_types)
     else:
         media_types = prompt_media_types(default=ALL_MEDIA_TYPES)
 
@@ -60,17 +60,27 @@ def _resolve_options(
     else:
         resolved_out = prompt_output_dir(DEFAULT_OUTPUT_DIR)
 
-    resolved_pages: int | None
-    if not need_max_pages:
-        resolved_pages = None
-    elif max_pages is not None:
+    if max_pages is not None:
         resolved_pages = max_pages
     elif defaults.max_pages is not None:
         resolved_pages = defaults.max_pages
     else:
         resolved_pages = prompt_max_pages(DEFAULT_MAX_PAGES)
 
-    return media_types, resolved_out, resolved_pages
+    resolved_workers = workers if workers is not None else (defaults.workers or DEFAULT_WORKERS)
+    resolved_scrape_workers = (
+        scrape_workers
+        if scrape_workers is not None
+        else (defaults.scrape_workers or DEFAULT_SCRAPE_WORKERS)
+    )
+
+    return ResolvedOptions(
+        media_types=media_types,
+        output_dir=resolved_out,
+        max_pages=resolved_pages,
+        workers=resolved_workers,
+        scrape_workers=resolved_scrape_workers,
+    )
 
 
 def _load_proxies() -> list[dict] | None:
@@ -103,9 +113,7 @@ def _load_proxies() -> list[dict] | None:
         logger.error("{}", exc)
         raise typer.Exit(1) from exc
     except Exception as exc:
-        logger.warning(
-            "Could not load {} proxies, scraping without proxy: {}", provider.name, exc
-        )
+        logger.warning("Could not load {} proxies, scraping without proxy: {}", provider.name, exc)
         return None
 
 
@@ -146,20 +154,6 @@ def download(
             "If omitted, uses the value from config.yaml or prompts interactively.",
         ),
     ] = None,
-    video_only: Annotated[
-        bool,
-        typer.Option("--video-only", help="Download only videos and GIFs/animations."),
-    ] = False,
-    image_only: Annotated[
-        bool,
-        typer.Option("--image-only", help="Download only images."),
-    ] = False,
-    from_json: Annotated[
-        bool,
-        typer.Option(
-            "--from-json", help="Use existing JSON files in ./input/ instead of scraping."
-        ),
-    ] = False,
     save_json: Annotated[
         bool,
         typer.Option(
@@ -175,17 +169,23 @@ def download(
         ),
     ] = None,
     workers: Annotated[
-        int,
-        typer.Option("--workers", "-w", help="Number of parallel download threads."),
-    ] = 16,
+        int | None,
+        typer.Option(
+            "--workers",
+            "-w",
+            help="Number of parallel download threads. "
+            "If omitted, uses the value from config.yaml (default: 16).",
+        ),
+    ] = None,
     scrape_workers: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--scrape-workers",
             "-sw",
-            help="Max parallel camoufox scraper processes (default: cpu_count // 2).",
+            help="Max parallel camoufox scraper processes. "
+            "If omitted, uses the value from config.yaml (default: 1).",
         ),
-    ] = max(1, (os.cpu_count() or 2) // 2),
+    ] = None,
     resume: Annotated[
         bool,
         typer.Option("--resume", help="Resume the most recent interrupted download session."),
@@ -202,19 +202,8 @@ def download(
     ] = False,
 ) -> None:
     """Download media from Reddit subreddits."""
-    if video_only and image_only:
-        logger.error("Cannot use --video-only and --image-only together.")
-        raise typer.Exit(1)
-
     if resume:
         _handle_resume(workers)
-        return
-
-    if from_json:
-        media_types, resolved_output_dir, _ = _resolve_options(
-            video_only, image_only, output_dir, max_pages, need_max_pages=False
-        )
-        _handle_from_json(media_types, workers, resolved_output_dir)
         return
 
     check_camoufox_binary()
@@ -226,10 +215,10 @@ def download(
     else:
         sub_list = prompt_subreddits()
 
-    media_types, resolved_output_dir, resolved_max_pages = _resolve_options(
-        video_only, image_only, output_dir, max_pages
-    )
-    session_dir = _ensure_output_dir(resolved_output_dir)
+    opts = _resolve_options(output_dir, max_pages, workers, scrape_workers)
+    media_types = opts.media_types
+    resolved_max_pages = opts.max_pages
+    session_dir = _ensure_output_dir(opts.output_dir)
 
     logger.info(
         "Scraping {} subreddit(s): {}",
@@ -254,7 +243,7 @@ def download(
 
     def download_consumer():
         ok, fail = run_download_queue(
-            download_q, session_dir, workers, media_types, state, progress=progress
+            download_q, session_dir, opts.workers, media_types, state, progress=progress
         )
         download_results.append((ok, fail))
 
@@ -274,7 +263,7 @@ def download(
         scrape_parallel(
             sub_list,
             max_pages=resolved_max_pages,
-            max_workers=min(len(sub_list), scrape_workers),
+            max_workers=min(len(sub_list), opts.scrape_workers),
             on_complete=on_sub_complete,
             progress=progress,
             proxies=proxies,
@@ -295,8 +284,11 @@ def download(
         logger.info("Resume with: rye run download-reddit-media --resume")
 
 
-def _handle_resume(workers: int) -> None:
+def _handle_resume(workers: int | None) -> None:
     """Resume the most recent interrupted download session."""
+    defaults = get_defaults()
+    resolved_workers = workers if workers is not None else (defaults.workers or DEFAULT_WORKERS)
+
     from python_reddit_scraper.downloader.state import SessionState
 
     state_path = SessionState.find_latest()
@@ -331,10 +323,11 @@ def _handle_resume(workers: int) -> None:
                 state.save()
                 logger.info("r/{}: scraped {} media items", sub, len(media))
 
+            resume_scrape_workers = defaults.scrape_workers or DEFAULT_SCRAPE_WORKERS
             scrape_parallel(
                 pending_subs,
-                max_pages=50,
-                max_workers=min(len(pending_subs), max(1, (os.cpu_count() or 2) // 2)),
+                max_pages=defaults.max_pages or DEFAULT_MAX_PAGES,
+                max_workers=min(len(pending_subs), resume_scrape_workers),
                 on_complete=on_sub_complete,
                 proxies=_load_proxies(),
             )
@@ -364,7 +357,7 @@ def _handle_resume(workers: int) -> None:
     ok, fail, _errors = download_all(
         pending,
         output_dir,
-        workers=workers,
+        workers=resolved_workers,
         on_file_done=state.mark_downloaded,
         on_file_failed=state.mark_permanently_failed,
     )
@@ -381,39 +374,6 @@ def _handle_resume(workers: int) -> None:
             "{} files still pending — resume again with: download-reddit-media --resume",
             len(remaining),
         )
-
-
-def _handle_from_json(
-    media_types: frozenset[str], workers: int, base_output_dir: str
-) -> None:
-    """Handle --from-json mode: load JSON files and download."""
-    logger.info("Loading posts from ./input/ JSON files...")
-    posts = parse_json_files("./input")
-
-    if not posts:
-        logger.error("No posts found.")
-        raise typer.Exit(1)
-
-    logger.info("Total posts: {}", len(posts))
-    logger.info("Extracting media URLs...")
-    all_media = extract_all_media(posts)
-    logger.info("Found {} unique media files", len(all_media))
-
-    if media_types and media_types != ALL_MEDIA_TYPES:
-        all_media = filter_by_media_type(all_media, media_types=media_types)
-        logger.info("After filter: {} {}", len(all_media), ", ".join(sorted(media_types)))
-
-    if not all_media:
-        logger.warning("No media files matched the filter criteria.")
-        raise typer.Exit(0)
-
-    output_dir = _ensure_output_dir(base_output_dir)
-
-    logger.info("Downloading {} files with {} workers...", len(all_media), workers)
-    ok, fail, _errors = download_all(all_media, output_dir, workers=workers)
-
-    subs = sorted({m.get("subreddit", "") for m in all_media} - {""})
-    _print_summary(output_dir, ok, fail, subs)
 
 
 def _print_summary(output_dir: str, successful: int, failed: int, subreddits: list[str]) -> None:

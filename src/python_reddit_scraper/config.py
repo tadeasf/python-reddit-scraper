@@ -36,6 +36,8 @@ class Defaults:
     media_types: tuple[str, ...] | None = None
     output_dir: str | None = None
     max_pages: int | None = None
+    workers: int | None = None
+    scrape_workers: int | None = None
 
 
 def load_config() -> dict:
@@ -79,17 +81,30 @@ def get_defaults() -> Defaults:
         logger.warning("Ignoring non-string output_dir in config.")
         output_dir = None
 
-    max_pages = raw.get("max_pages")
-    if max_pages is not None:
+    def _positive_int(key: str) -> int | None:
+        val = raw.get(key)
+        if val is None:
+            return None
         try:
-            max_pages = int(max_pages)
-            if max_pages <= 0:
+            parsed = int(val)
+            if parsed <= 0:
                 raise ValueError
         except (TypeError, ValueError):
-            logger.warning("Ignoring invalid max_pages in config: {!r}", raw.get("max_pages"))
-            max_pages = None
+            logger.warning("Ignoring invalid {} in config: {!r}", key, val)
+            return None
+        return parsed
 
-    return Defaults(media_types=media_types, output_dir=output_dir, max_pages=max_pages)
+    max_pages = _positive_int("max_pages")
+    workers = _positive_int("workers")
+    scrape_workers = _positive_int("scrape_workers")
+
+    return Defaults(
+        media_types=media_types,
+        output_dir=output_dir,
+        max_pages=max_pages,
+        workers=workers,
+        scrape_workers=scrape_workers,
+    )
 
 
 def save_defaults(defaults: Defaults) -> Path:
@@ -108,6 +123,10 @@ def save_defaults(defaults: Defaults) -> Path:
         block["output_dir"] = defaults.output_dir
     if defaults.max_pages is not None:
         block["max_pages"] = defaults.max_pages
+    if defaults.workers is not None:
+        block["workers"] = defaults.workers
+    if defaults.scrape_workers is not None:
+        block["scrape_workers"] = defaults.scrape_workers
     cfg["defaults"] = block
 
     with _CONFIG_PATH.open("w") as f:

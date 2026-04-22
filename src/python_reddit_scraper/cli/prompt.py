@@ -101,11 +101,27 @@ def prompt_output_dir(default: str) -> str:
 
 def prompt_max_pages(default: int) -> int:
     """Prompt for max pages (positive int); empty input returns *default*."""
-    _require_tty("max pages")
+    return _prompt_positive_int("Max pages per subreddit", default, "max pages")
+
+
+def prompt_workers(default: int) -> int:
+    """Prompt for number of parallel download threads; empty input returns *default*."""
+    return _prompt_positive_int("Parallel download threads", default, "download workers")
+
+
+def prompt_scrape_workers(default: int) -> int:
+    """Prompt for number of parallel camoufox scraper processes; empty input returns *default*."""
+    return _prompt_positive_int(
+        "Parallel scraper processes (1 = sequential)", default, "scrape workers"
+    )
+
+
+def _prompt_positive_int(label: str, default: int, what: str) -> int:
+    _require_tty(what)
     from prompt_toolkit import prompt
 
     while True:
-        raw = prompt(f"Max pages per subreddit [{default}]: ").strip()
+        raw = prompt(f"{label} [{default}]: ").strip()
         if not raw:
             return default
         try:
