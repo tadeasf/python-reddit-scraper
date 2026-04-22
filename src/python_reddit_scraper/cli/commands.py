@@ -36,13 +36,13 @@ def _load_proxies() -> list[dict] | None:
     if not api_keys:
         return None
     try:
-        from camoufox.geolocation import download_mmdb
+        from camoufox.locale import download_mmdb
 
         download_mmdb()
         return fetch_proxies_with_fallback(api_keys)
     except AllAccountsExhaustedError as exc:
         logger.error("{}", exc)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     except Exception as exc:
         logger.warning("Could not load Webshare proxies, scraping without proxy: {}", exc)
         return None

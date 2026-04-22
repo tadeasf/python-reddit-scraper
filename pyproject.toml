@@ -5,7 +5,7 @@ description = "Python tool for scraping and downloading media from Reddit"
 authors = [{ name = "Tadeáš Fořt", email = "tadeasfort@proton.me" }]
 dependencies = [
     "rich>=13.0",
-    "camoufox>=0.4.0",
+    "camoufox[geoip]>=0.4.0",
     "prompt-toolkit>=3.0.0",
     "typer>=0.15.0",
     "loguru>=0.7.0",
