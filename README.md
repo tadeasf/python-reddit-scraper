@@ -8,16 +8,18 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 - **Parallel scraping**: Multiple subreddits scraped concurrently with separate browser instances
 - **Queued downloads**: Downloads start as each subreddit finishes scraping — no waiting for all scrapes
 - **Resume support**: Interrupted downloads can be resumed with `--resume`
-- **Interactive prompt**: Enter subreddit names interactively or via CLI flags
+- **Interactive setup**: First-run prompts (or `configure` subcommand) let you pick media types with a checkbox dialog, plus output dir and page depth
+- **Persistent defaults**: Stores your preferences in `~/.config/python_reddit_scraper/config.yaml` so you never have to repeat flags
 - **High-quality downloads**: Automatically selects highest resolution media
 - **Fast concurrent downloads**: Uses 16 parallel workers for maximum speed
 - **Configurable output**: `--output-dir` to choose where files are saved
 - **Smart organization**: Auto-sorts files into `images/`, `videos/`, and `gifs/` per subreddit
-- **Media filtering**: `--video-only` or `--image-only` flags to download specific types
+- **Granular media filtering**: Pick any combination of `images` / `videos` / `gifs` interactively, or keep the legacy `--video-only` / `--image-only` shortcut flags
 - **Real-time progress**: Beautiful progress bars for both scraping and downloading
 - **Timestamped sessions**: Creates dated directories for each download session
 - **Deduplication**: Avoids downloading the same file twice
 - **JSON caching**: `--save-json` to cache scraped data for later reuse
+- **Multi-provider proxies**: Webshare (rotating via API) and proxy-cheap (static HTTP) with per-account fallback
 
 ## Installation
 
@@ -52,20 +54,35 @@ After this you can run `download-reddit-media` directly in any terminal without 
 
 ### Automated scraping (recommended)
 
-Run the tool and enter subreddit names when prompted:
+Run the tool and answer the interactive prompts:
 
 ```bash
 uv run download-reddit-media
 # Enter subreddits (comma-separated): buildapc,dataengineering
+# Media types dialog:  [x] images  [x] videos  [x] gifs   (space toggles, enter confirms)
+# Output directory [./redditdownloads]: <enter>
+# Max pages per subreddit [50]: <enter>
 ```
 
-Or pass subreddits directly:
+Or pass everything on the command line to skip every prompt:
 
 ```bash
-uv run download-reddit-media --subreddits buildapc,dataengineering
+uv run download-reddit-media --subreddits buildapc,dataengineering --max-pages 20
 ```
 
+### Save your defaults (skip the prompts next time)
+
+Run `configure` once to save your preferred media types, output directory, and page depth:
+
+```bash
+uv run download-reddit-media configure
+```
+
+Defaults are written to `~/.config/python_reddit_scraper/config.yaml` under the `defaults:` block. From then on `download-reddit-media` picks them up automatically — any explicit flag still wins.
+
 ### Download only videos or images
+
+The legacy shortcut flags still work:
 
 ```bash
 # Videos and GIFs only
@@ -74,6 +91,8 @@ uv run download-reddit-media -s wallpapers --video-only
 # Images only
 uv run download-reddit-media -s wallpapers --image-only
 ```
+
+For finer-grained picks (e.g. images + gifs but no videos), either answer the interactive checkbox or set `defaults.media_types` in `config.yaml`.
 
 ### Resume interrupted downloads
 
@@ -96,18 +115,62 @@ uv run download-reddit-media --from-json
 ### All options
 
 ```
+Usage: download-reddit-media [OPTIONS]
+       download-reddit-media configure        # interactive defaults setup
+
 Options:
-  -s, --subreddits TEXT    Comma-separated subreddit names
-  -o, --output-dir TEXT    Base directory for downloads (default: ./redditdownloads)
-  --video-only             Download only videos and GIFs/animations
-  --image-only             Download only images
-  --from-json              Use existing JSON files in ./input/ instead of scraping
-  --save-json              Save scraped JSON to ./input/{subreddit}/
-  --max-pages INTEGER      Max pages per subreddit (default: 50 ≈ 5000 posts)
-  -w, --workers INTEGER    Parallel download threads (default: 16)
-  --resume                 Resume the most recent interrupted download session
-  --help                   Show this message and exit
+  -s, --subreddits TEXT       Comma-separated subreddit names (prompts if omitted)
+  -o, --output-dir TEXT       Base directory for downloads
+                              (default: config.yaml → interactive prompt → ./redditdownloads)
+  --video-only                Download only videos and GIFs/animations
+  --image-only                Download only images
+  --from-json                 Use existing JSON files in ./input/ instead of scraping
+  --save-json                 Save scraped JSON to ./input/{subreddit}/
+  --max-pages INTEGER         Max pages per subreddit
+                              (default: config.yaml → interactive prompt → 50 ≈ 5000 posts)
+  -w, --workers INTEGER       Parallel download threads (default: 16)
+  -sw, --scrape-workers INT   Max parallel camoufox scrapers (default: cpu_count // 2)
+  --resume                    Resume the most recent interrupted download session
+  -V, --version               Show version and exit
+  --help                      Show this message and exit
 ```
+
+When a filter flag or value is missing, resolution order is: **CLI flag → `config.yaml` defaults → interactive prompt**.
+
+## Configuration
+
+All user configuration lives in `~/.config/python_reddit_scraper/config.yaml`. The file is split into two optional top-level blocks — set either, both, or neither.
+
+```yaml
+# Defaults applied when the matching CLI flag is not passed.
+# Populate this by running `download-reddit-media configure` (recommended)
+# or by editing the file directly.
+defaults:
+  media_types: [images, videos, gifs]   # any non-empty subset of these three
+  output_dir: /home/you/redditdownloads
+  max_pages: 50
+
+# Proxy providers. Multiple providers and accounts are supported; the
+# tool prompts when more than one provider is configured and falls back
+# across accounts if one is exhausted.
+providers:
+  - name: webshare
+    accounts:
+      - email: you@example.com
+        api_key: <webshare-api-key>
+  - name: proxy-cheap
+    accounts:
+      - username: <user>
+        password: <pass>
+        ip_address: 178.93.44.23
+        port: 46271
+```
+
+### Proxy notes
+
+- **webshare** accounts are refreshed via the Webshare API on every run.
+- **proxy-cheap** accounts are static HTTP endpoints. Authenticated SOCKS5 is **not** supported — Camoufox is built on Playwright's Firefox, which cannot pass credentials for SOCKS5 proxies (`Browser does not support socks5 proxy authentication`). Request an HTTP endpoint from your proxy-cheap dashboard.
+- If every account for the chosen provider has exhausted its bandwidth, the tool exits with a clear error rather than silently scraping direct.
 
 ## How It Works
 

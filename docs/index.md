@@ -4,19 +4,24 @@ A fast Python tool that scrapes Reddit subreddits using a stealth browser and do
 
 ## Features
 
-- **Automated scraping** — Stealth browser ([camoufox](https://github.com/nickheal/camoufox)) fetches Reddit's JSON API
+- **Automated scraping** — Stealth browser ([camoufox](https://github.com/daijro/camoufox)) fetches Reddit's JSON API
 - **Parallel scraping** — Multiple subreddits scraped concurrently, downloads queued automatically
 - **Resume support** — Interrupted downloads can be resumed with `--resume`
-- **Interactive prompt** — Enter subreddit names interactively or via CLI flags
+- **Interactive setup** — First-run prompts (or `download-reddit-media configure`) let you pick media types via a checkbox dialog, output dir, and page depth
+- **Persistent defaults** — Stored in `~/.config/python_reddit_scraper/config.yaml` so you never repeat flags
 - **High-quality downloads** — Selects highest resolution media automatically
 - **Concurrent downloads** — 16 parallel workers for maximum speed
 - **Smart organization** — Files sorted into `images/`, `videos/`, `gifs/` per subreddit
-- **Media filtering** — `--video-only` or `--image-only` flags
+- **Granular media filtering** — Any subset of `images` / `videos` / `gifs`, or the legacy `--video-only` / `--image-only` shortcuts
 - **JSON caching** — `--save-json` to cache scraped data for later reuse
+- **Multi-provider proxies** — Webshare (rotating via API) and proxy-cheap (static HTTP) with per-account fallback
 
 ## Quick Example
 
 ```bash
+# First-time setup — save your preferred defaults
+uv run download-reddit-media configure
+
 # Scrape and download everything from two subreddits
 uv run download-reddit-media -s wallpapers,earthporn
 

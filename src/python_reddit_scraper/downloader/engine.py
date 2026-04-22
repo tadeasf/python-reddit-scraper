@@ -212,8 +212,7 @@ def run_download_queue(
     download_q: queue.Queue[tuple[str, list[dict]] | None],
     output_dir: str,
     workers: int,
-    video_only: bool,
-    image_only: bool,
+    media_types: set[str] | frozenset[str] | None,
     state=None,
     progress: ProgressDisplay | None = None,
 ) -> tuple[int, int]:
@@ -231,7 +230,7 @@ def run_download_queue(
         sub, posts = item
 
         media = extract_all_media(posts)
-        media = filter_by_media_type(media, video_only=video_only, image_only=image_only)
+        media = filter_by_media_type(media, media_types=media_types)
         if not media:
             logger.info("r/{}: no media after filtering", sub)
             download_q.task_done()

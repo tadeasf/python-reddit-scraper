@@ -116,6 +116,12 @@ def _load_proxy_cheap(accounts: list[dict]) -> list[dict]:
     """Materialize proxy-cheap accounts into Camoufox-ready proxy dicts.
 
     Each account is already a single proxy endpoint (no API call needed).
+    Only HTTP proxies are supported — Camoufox is built on Playwright's
+    Firefox, which does not support authenticated SOCKS5 proxies
+    (Playwright raises ``Browser does not support socks5 proxy authentication``
+    on launch). A leftover ``protocol`` field in the config is ignored with a
+    warning so existing setups keep working while the user updates their YAML.
+
     Returns the full list so workers can distribute them round-robin.
     """
     if not accounts:
@@ -123,6 +129,17 @@ def _load_proxy_cheap(accounts: list[dict]) -> list[dict]:
 
     proxies: list[dict] = []
     for acct in accounts:
+        protocol = acct.get("protocol")
+        if protocol is not None and str(protocol).lower() != "http":
+            logger.warning(
+                "proxy-cheap {}:{}: `protocol: {}` is ignored — only HTTP is "
+                "supported (Camoufox/Firefox cannot authenticate SOCKS5). "
+                "Using HTTP.",
+                acct["ip_address"],
+                acct["port"],
+                protocol,
+            )
+
         label = f"{acct['ip_address']}:{acct['port']}"
         proxies.append(
             {
