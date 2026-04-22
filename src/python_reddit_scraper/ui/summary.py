@@ -9,7 +9,6 @@ Two callers:
 from __future__ import annotations
 
 import time
-from collections import Counter
 from pathlib import Path
 
 from rich.box import ROUNDED
@@ -72,51 +71,6 @@ def print_summary(
         title=f"[bold cyan] {title} [/bold cyan]",
         subtitle=f"[dim]{output_dir}[/dim]",
         border_style=BORDER,
-        box=ROUNDED,
-    )
-    log_console.print(panel)
-
-
-def print_dry_run(
-    counts: dict[str, Counter[str]],
-    *,
-    started_at: float | None = None,
-) -> None:
-    """Render a DRY RUN panel of per-subreddit media counts; no disk I/O."""
-    table = Table(
-        box=ROUNDED,
-        border_style="bright_black",
-        header_style="bold cyan",
-        expand=False,
-    )
-    table.add_column("Subreddit", style="cyan", no_wrap=True)
-    for name in _MEDIA_DIRS:
-        table.add_column(name.capitalize(), justify="right")
-    table.add_column("Total", justify="right", style="bold")
-
-    total_files = 0
-    for sub, c in counts.items():
-        files = sum(c.values())
-        total_files += files
-        table.add_row(
-            f"r/{sub}",
-            *[str(c[n]) if c[n] else "—" for n in _MEDIA_DIRS],
-            str(files),
-        )
-
-    elapsed = time.time() - started_at if started_at else None
-    footer = Text()
-    footer.append("  ")
-    footer.append(f"{total_files} files would download", style="bold yellow")
-    if elapsed is not None:
-        footer.append("  ·  ", style="bright_black")
-        footer.append(_fmt_duration(elapsed), style="dim")
-
-    panel = Panel(
-        _stack(table, footer),
-        title="[bold yellow] DRY RUN [/bold yellow]",
-        subtitle="[dim]no files were written[/dim]",
-        border_style="yellow",
         box=ROUNDED,
     )
     log_console.print(panel)
