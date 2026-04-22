@@ -101,20 +101,21 @@ download-reddit-media -s wallpapers -o ~/Pictures/reddit
 
 ## Output Structure
 
-Files are organized by subreddit and media type:
+Files live directly under the output directory, organized by subreddit and media type:
 
 ```
 <output-dir>/
-└── 2025-01-27_14-30-45/
-    ├── wallpapers/
-    │   ├── images/
-    │   ├── videos/
-    │   └── gifs/
-    └── earthporn/
-        ├── images/
-        ├── videos/
-        └── gifs/
+├── wallpapers/
+│   ├── images/
+│   ├── videos/
+│   └── gifs/
+└── earthporn/
+    ├── images/
+    ├── videos/
+    └── gifs/
 ```
+
+Re-running against the same output directory is how you refresh a subreddit — the scraper fetches fresh posts and the downloader skips any file already on disk (via an on-disk exists-check). Partial downloads are written to `{filename}.part` and renamed atomically on success, so an interrupted write never masquerades as complete.
 
 ## Configuration File
 

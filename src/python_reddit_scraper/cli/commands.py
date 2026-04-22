@@ -7,7 +7,6 @@ Handles the main download command and its sub-modes (live scrape, resume, from-j
 import os
 import queue
 import threading
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -118,12 +117,15 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-def _build_output_dir(base: str) -> str:
-    """Create a timestamped output directory under *base* and return its path."""
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = os.path.join(base, timestamp)
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    return output_dir
+def _ensure_output_dir(base: str) -> str:
+    """Ensure *base* exists and return it.
+
+    The tree lives at ``{base}/{subreddit}/{media_type}/`` — flat, no timestamp
+    subdirs. Re-runs against the same *base* deduplicate by skipping files that
+    already exist on disk (see :func:`downloader.engine.download_all`).
+    """
+    Path(base).mkdir(parents=True, exist_ok=True)
+    return base
 
 
 def download(
@@ -227,7 +229,7 @@ def download(
     media_types, resolved_output_dir, resolved_max_pages = _resolve_options(
         video_only, image_only, output_dir, max_pages
     )
-    session_dir = _build_output_dir(resolved_output_dir)
+    session_dir = _ensure_output_dir(resolved_output_dir)
 
     logger.info(
         "Scraping {} subreddit(s): {}",
@@ -405,13 +407,13 @@ def _handle_from_json(
         logger.warning("No media files matched the filter criteria.")
         raise typer.Exit(0)
 
-    session_dir = _build_output_dir(base_output_dir)
+    output_dir = _ensure_output_dir(base_output_dir)
 
     logger.info("Downloading {} files with {} workers...", len(all_media), workers)
-    ok, fail, _errors = download_all(all_media, session_dir, workers=workers)
+    ok, fail, _errors = download_all(all_media, output_dir, workers=workers)
 
     subs = sorted({m.get("subreddit", "") for m in all_media} - {""})
-    _print_summary(session_dir, ok, fail, subs)
+    _print_summary(output_dir, ok, fail, subs)
 
 
 def _print_summary(output_dir: str, successful: int, failed: int, subreddits: list[str]) -> None:

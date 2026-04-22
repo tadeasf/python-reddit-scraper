@@ -38,11 +38,25 @@ _BACKOFF_BASE = 1.5
 
 
 def _fetch_url(url: str, filepath: str) -> None:
-    """Fetch *url* into *filepath* using urllib."""
+    """Fetch *url* into *filepath* via a ``.part`` tmp file + atomic rename.
+
+    The tmp+rename means an interrupted download never leaves a half-written
+    file at the final path — important for the cross-session dedup in
+    :func:`download_all`, which treats "file exists" as "already downloaded".
+    """
+    import contextlib
+
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    tmp = filepath + ".part"
     req = Request(url, headers=_HEADERS)
-    with urlopen(req, timeout=30) as response, open(filepath, "wb") as f:
-        f.write(response.read())
+    try:
+        with urlopen(req, timeout=30) as response, open(tmp, "wb") as f:
+            f.write(response.read())
+        os.replace(tmp, filepath)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(tmp)
+        raise
 
 
 def download_file(
@@ -140,6 +154,7 @@ def download_all(
     successful = 0
     failed = 0
     skipped_optional = 0
+    skipped_existing = 0
     error_counts: Counter = Counter()
 
     # Fallback: local rich progress bar when no shared ProgressDisplay is provided
@@ -158,6 +173,23 @@ def download_all(
         local_progress.start()
         local_task_id = local_progress.add_task("Downloading", total=len(download_items))
 
+    # Cross-session dedup: files already on disk are treated as successes.
+    # Flat `{output_dir}/{subreddit}/{media_type}/` layout makes this a
+    # reliable "I already have this post" signal across runs.
+    fresh_items: list[tuple[str, str, list[str], bool]] = []
+    for url, filepath, fallbacks, optional in download_items:
+        if os.path.exists(filepath):
+            skipped_existing += 1
+            successful += 1
+            if on_file_done:
+                on_file_done(url)
+            if progress is not None:
+                progress.advance_download()
+            elif local_progress is not None and local_task_id is not None:
+                local_progress.advance(local_task_id)
+            continue
+        fresh_items.append((url, filepath, fallbacks, optional))
+
     try:
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
@@ -167,7 +199,7 @@ def download_all(
                     filepath,
                     fallback_urls=fallbacks,
                 ): (url, filepath, optional)
-                for url, filepath, fallbacks, optional in download_items
+                for url, filepath, fallbacks, optional in fresh_items
             }
             for future in as_completed(future_map):
                 url, filepath, is_optional = future_map[future]
@@ -196,6 +228,11 @@ def download_all(
         if local_progress is not None:
             local_progress.stop()
 
+    if skipped_existing:
+        logger.info(
+            "Skipped {} file(s) already on disk (cross-session dedup)",
+            skipped_existing,
+        )
     if skipped_optional:
         logger.info(
             "Skipped {} optional files (audio tracks blocked by Reddit CDN)",
