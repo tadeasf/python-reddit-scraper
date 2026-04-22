@@ -190,27 +190,27 @@ Session state is saved to `.scraper-state/` after scraping completes. If downloa
 
 ## Output Structure
 
-Files are automatically organized by subreddit and media type inside the
-output directory (`./redditdownloads` by default, configurable with `-o`):
+Files live directly under the output directory (`./redditdownloads` by default, configurable with `-o`), organized by subreddit and media type — **no per-run timestamp subdirectory**:
 
 ```bash
 redditdownloads/
-└── 2025-01-27_14-30-45/
-    ├── wallpapers/
-    │   ├── images/
-    │   ├── videos/
-    │   └── gifs/
-    └── earthporn/
-        ├── images/
-        ├── videos/
-        └── gifs/
+├── wallpapers/
+│   ├── images/
+│   ├── videos/
+│   └── gifs/
+└── earthporn/
+    ├── images/
+    ├── videos/
+    └── gifs/
 ```
+
+Re-running against the same output directory is the supported way to **refresh** a subreddit: the scraper re-fetches posts up to `--max-pages`, but the downloader skips any file that already exists on disk, so only genuinely new media is transferred. Interrupted downloads write to `{filename}.part` and atomically rename on success, so a partial file never looks complete.
 
 Use `--output-dir` / `-o` to change the base path:
 
 ```bash
 uv run download-reddit-media -s wallpapers -o ~/Pictures/reddit
-# Files will be saved to ~/Pictures/reddit/2025-01-27_14-30-45/wallpapers/...
+# Files will be saved to ~/Pictures/reddit/wallpapers/...
 ```
 
 ## Advanced: Manual JSON Workflow
