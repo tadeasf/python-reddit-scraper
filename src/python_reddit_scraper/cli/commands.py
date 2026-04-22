@@ -20,6 +20,42 @@ from python_reddit_scraper.downloader.media import extract_all_media, filter_by_
 from python_reddit_scraper.scraper.json_io import parse_json_files
 
 
+def _load_proxies() -> list[dict] | None:
+    """Load proxies for the chosen provider, with per-account fallback.
+
+    Returns the working proxy pool or None when no providers are configured.
+    Prompts for a provider when multiple are present in the YAML config.
+    Prints a clear error and exits if every account for the picked provider
+    has hit its bandwidth limit.
+    """
+    from python_reddit_scraper.cli.prompt import choose_provider
+    from python_reddit_scraper.config import get_providers
+    from python_reddit_scraper.scraper.proxy_handler import (
+        AllAccountsExhaustedError,
+        load_proxies_for_provider,
+    )
+
+    providers = get_providers()
+    if not providers:
+        return None
+
+    provider = choose_provider(providers)
+
+    try:
+        from camoufox.locale import download_mmdb
+
+        download_mmdb()
+        return load_proxies_for_provider(provider)
+    except AllAccountsExhaustedError as exc:
+        logger.error("{}", exc)
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        logger.warning(
+            "Could not load {} proxies, scraping without proxy: {}", provider.name, exc
+        )
+        return None
+
+
 def _version_callback(value: bool) -> None:
     if value:
         from python_reddit_scraper import __app_name__, __version__
@@ -119,6 +155,8 @@ def download(
 
     check_camoufox_binary()
 
+    proxies = _load_proxies()
+
     if subreddits:
         sub_list = [s.strip().lstrip("r/") for s in subreddits.split(",") if s.strip()]
     else:
@@ -172,6 +210,7 @@ def download(
             max_workers=min(len(sub_list), scrape_workers),
             on_complete=on_sub_complete,
             progress=progress,
+            proxies=proxies,
         )
 
         download_q.put(None)
@@ -234,6 +273,7 @@ def _handle_resume(workers: int) -> None:
                 max_pages=50,
                 max_workers=min(len(pending_subs), max(1, (os.cpu_count() or 2) // 2)),
                 on_complete=on_sub_complete,
+                proxies=_load_proxies(),
             )
         except Exception as exc:
             logger.warning("Could not re-scrape pending subreddits: {}", exc)
