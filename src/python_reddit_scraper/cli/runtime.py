@@ -26,6 +26,7 @@ from python_reddit_scraper.ui.prompts import (
     prompt_media_types,
     prompt_output_dir,
 )
+from python_reddit_scraper.ui.spinner import spinner
 
 
 @dataclass(frozen=True)
@@ -83,19 +84,20 @@ def resolve_options(
 
 def check_camoufox_binary() -> None:
     """Verify the stealth Firefox binary required by camoufox is installed."""
-    try:
-        from camoufox.pkgman import installed_verstr
+    with spinner("Verifying Camoufox binary…"):
+        try:
+            from camoufox.pkgman import installed_verstr
 
-        ver = installed_verstr()
-        if not ver:
-            raise FileNotFoundError
-    except Exception:
-        logger.error(
-            "Camoufox browser not found. Run this command first:\n\n"
-            "    uv run camoufox fetch\n\n"
-            "This downloads the stealth Firefox binary (~80 MB, one-time setup)."
-        )
-        raise typer.Exit(1) from None
+            ver = installed_verstr()
+            if not ver:
+                raise FileNotFoundError
+        except Exception:
+            logger.error(
+                "Camoufox browser not found. Run this command first:\n\n"
+                "    uv run camoufox fetch\n\n"
+                "This downloads the stealth Firefox binary (~80 MB, one-time setup)."
+            )
+            raise typer.Exit(1) from None
 
 
 def load_proxies() -> list[dict] | None:
@@ -120,8 +122,10 @@ def load_proxies() -> list[dict] | None:
     try:
         from camoufox.locale import download_mmdb
 
-        download_mmdb()
-        return load_proxies_for_provider(provider)
+        with spinner("Downloading GeoIP database…"):
+            download_mmdb()
+        with spinner(f"Probing {provider.name} accounts…"):
+            return load_proxies_for_provider(provider)
     except AllAccountsExhaustedError as exc:
         logger.error("{}", exc)
         raise typer.Exit(1) from exc
