@@ -216,8 +216,6 @@ def download_all(
                         skipped_optional += 1
                     else:
                         failed += 1
-                        if progress is not None:
-                            progress.mark_download_failure()
                     error_counts[reason] += 1
                     if on_file_failed:
                         on_file_failed(url, reason, permanent)

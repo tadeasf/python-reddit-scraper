@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 import typer
@@ -18,35 +17,21 @@ from python_reddit_scraper.constants import (
 from python_reddit_scraper.downloader.engine import download_all
 from python_reddit_scraper.downloader.media import extract_all_media, filter_by_media_type
 from python_reddit_scraper.downloader.state import SessionState
-from python_reddit_scraper.ui.banner import print_banner
-from python_reddit_scraper.ui.prompts import pick_resume_session
-from python_reddit_scraper.ui.summary import print_summary
 
 
 def run_resume(workers: int | None) -> None:
-    """Resume a previously interrupted download session.
-
-    When a single interrupted session exists it is picked automatically;
-    otherwise the user picks via a radiolist dialog (Enter takes the newest).
-    """
+    """Resume the most recent interrupted download session."""
     defaults = get_defaults()
     resolved_workers = workers if workers is not None else (defaults.workers or DEFAULT_WORKERS)
 
-    state_paths = SessionState.list_all()
-    if not state_paths:
+    state_path = SessionState.find_latest()
+    if not state_path:
         logger.error("No interrupted session found in .scraper-state/")
         raise typer.Exit(1)
-
-    state_path = pick_resume_session([(p, _describe_state(p)) for p in state_paths])
-    if state_path is None:
-        logger.info("Resume cancelled.")
-        raise typer.Exit(0)
 
     logger.info("Resuming session from {}", state_path)
     state = SessionState.load(state_path)
     output_dir = state.output_dir
-
-    print_banner("resume", subreddit_count=len(state.subreddits))
 
     pending_subs = [sub for sub, status in state.subreddits.items() if status == "pending"]
     if pending_subs:
@@ -70,7 +55,6 @@ def run_resume(workers: int | None) -> None:
         return
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    started_at = time.time()
 
     ok, fail, _errors = download_all(
         pending,
@@ -80,14 +64,7 @@ def run_resume(workers: int | None) -> None:
         on_file_failed=state.mark_permanently_failed,
     )
 
-    print_summary(
-        output_dir,
-        ok,
-        fail,
-        list(state.subreddits.keys()),
-        started_at=started_at,
-        title="Resume summary",
-    )
+    logger.success("Resume complete! {} successful, {} failed", ok, fail)
 
     remaining = state.get_pending_media()
     if not remaining:
@@ -99,21 +76,6 @@ def run_resume(workers: int | None) -> None:
             "{} files still pending — resume again with: download-reddit-media --resume",
             len(remaining),
         )
-
-
-def _describe_state(path: str) -> str:
-    """Build a short human-readable label for a state file (for the picker)."""
-    try:
-        state = SessionState.load(path)
-    except Exception:
-        return Path(path).name
-    total = len(state.media) or 1
-    done = sum(1 for m in state.media if m.get("downloaded"))
-    pct = int(100 * done / total)
-    subs = ", ".join(f"r/{s}" for s in list(state.subreddits)[:3])
-    if len(state.subreddits) > 3:
-        subs += f" (+{len(state.subreddits) - 3})"
-    return f"{Path(path).stem}  ·  {done}/{len(state.media)} ({pct}%)  ·  {subs}"
 
 
 def _rescrape_pending(state: SessionState, pending_subs: list[str], defaults) -> None:

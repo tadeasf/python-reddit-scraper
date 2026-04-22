@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import queue
 import threading
-import time
 from pathlib import Path
 
 from loguru import logger
@@ -15,7 +14,6 @@ from python_reddit_scraper.downloader.state import SessionState
 from python_reddit_scraper.progress import ProgressDisplay
 from python_reddit_scraper.scraper.json_io import save_scraped_json
 from python_reddit_scraper.scraper.parallel import scrape_parallel
-from python_reddit_scraper.ui.banner import print_banner
 from python_reddit_scraper.ui.prompts import prompt_subreddits
 from python_reddit_scraper.ui.summary import print_summary
 
@@ -40,13 +38,11 @@ def run_live(
     opts = resolve_options(output_dir, max_pages, workers, scrape_workers)
     session_dir = _ensure_output_dir(opts.output_dir)
 
-    print_banner("live", subreddit_count=len(sub_list))
     logger.info(
         "Scraping {} subreddit(s): {}",
         len(sub_list),
         ", ".join(f"r/{s}" for s in sub_list),
     )
-    started_at = time.time()
 
     state = SessionState(output_dir=session_dir, media_types=opts.media_types)
     for sub in sub_list:
@@ -94,13 +90,7 @@ def run_live(
     total_ok = sum(r[0] for r in download_results)
     total_fail = sum(r[1] for r in download_results)
 
-    print_summary(
-        session_dir,
-        total_ok,
-        total_fail,
-        list(state.subreddits.keys()),
-        started_at=started_at,
-    )
+    print_summary(session_dir, total_ok, total_fail, list(state.subreddits.keys()))
 
     if total_fail == 0:
         state.flush_and_cleanup()

@@ -145,14 +145,6 @@ class SessionState:
         files = sorted(state_dir.glob("*.json"), reverse=True)
         return str(files[0]) if files else None
 
-    @classmethod
-    def list_all(cls) -> list[str]:
-        """Return all state-file paths in ``.scraper-state/``, newest first."""
-        state_dir = Path(STATE_DIR)
-        if not state_dir.exists():
-            return []
-        return [str(p) for p in sorted(state_dir.glob("*.json"), reverse=True)]
-
     def mark_subreddit_scraped(self, sub: str) -> None:
         """Mark a subreddit as having been fully scraped."""
         self.subreddits[sub] = "scraped"
