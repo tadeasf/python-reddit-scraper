@@ -71,6 +71,15 @@ The CLI commands module provides the main download command.
       show_root_heading: true
       members_order: source
 
+### Runtime
+
+Shared runtime helpers used across CLI flows (env checks, config resolution).
+
+::: python_reddit_scraper.cli.runtime
+    options:
+      show_root_heading: true
+      members_order: source
+
 ### Configure
 
 Interactive subcommand that writes user defaults to `config.yaml`.
@@ -80,11 +89,78 @@ Interactive subcommand that writes user defaults to `config.yaml`.
       show_root_heading: true
       members_order: source
 
-### Prompt
+### History
 
-Interactive prompts and environment checks.
+`history` subcommand — lists past runs from the run log.
 
-::: python_reddit_scraper.cli.prompt
+::: python_reddit_scraper.cli.history_cmd
+    options:
+      show_root_heading: true
+      members_order: source
+
+### Flows — Live
+
+End-to-end scrape + download flow with a live dashboard.
+
+::: python_reddit_scraper.cli.flows.live
+    options:
+      show_root_heading: true
+      members_order: source
+
+### Flows — Resume
+
+Resume flow for continuing a previously interrupted download session.
+
+::: python_reddit_scraper.cli.flows.resume
+    options:
+      show_root_heading: true
+      members_order: source
+
+## UI
+
+### Prompts
+
+Interactive prompts (fuzzy-completed, styled) used by the CLI flows.
+
+::: python_reddit_scraper.ui.prompts
+    options:
+      show_root_heading: true
+      members_order: source
+
+### Theme
+
+Shared color palette and `prompt_toolkit` styles.
+
+::: python_reddit_scraper.ui.theme
+    options:
+      show_root_heading: true
+      members_order: source
+
+### Banner, Spinner, Summary, Tables
+
+Rich-based UI helpers — startup banner, run summary, preflight and history tables.
+
+::: python_reddit_scraper.ui.banner
+    options:
+      show_root_heading: true
+      members_order: source
+
+::: python_reddit_scraper.ui.spinner
+    options:
+      show_root_heading: true
+      members_order: source
+
+::: python_reddit_scraper.ui.summary
+    options:
+      show_root_heading: true
+      members_order: source
+
+::: python_reddit_scraper.ui.preflight_table
+    options:
+      show_root_heading: true
+      members_order: source
+
+::: python_reddit_scraper.ui.history_table
     options:
       show_root_heading: true
       members_order: source
