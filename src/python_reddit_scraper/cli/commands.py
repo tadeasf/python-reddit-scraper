@@ -21,25 +21,38 @@ from python_reddit_scraper.scraper.json_io import parse_json_files
 
 
 def _load_proxies() -> list[dict] | None:
-    """Load Webshare proxies if an API key is configured. Returns None on failure or no key."""
-    from python_reddit_scraper.config import get_webshare_api_key
-    from python_reddit_scraper.scraper.proxy_handler import fetch_proxies
+    """Load proxies for the chosen provider, with per-account fallback.
 
-    api_key = get_webshare_api_key()
-    if not api_key:
+    Returns the working proxy pool or None when no providers are configured.
+    Prompts for a provider when multiple are present in the YAML config.
+    Prints a clear error and exits if every account for the picked provider
+    has hit its bandwidth limit.
+    """
+    from python_reddit_scraper.cli.prompt import choose_provider
+    from python_reddit_scraper.config import get_providers
+    from python_reddit_scraper.scraper.proxy_handler import (
+        AllAccountsExhaustedError,
+        load_proxies_for_provider,
+    )
+
+    providers = get_providers()
+    if not providers:
         return None
+
+    provider = choose_provider(providers)
+
     try:
-        from camoufox.geolocation import download_mmdb
+        from camoufox.locale import download_mmdb
 
         download_mmdb()
-        proxies = fetch_proxies(api_key)
-        if proxies:
-            logger.info("Loaded {} Webshare proxy/proxies", len(proxies))
-        else:
-            logger.warning("Webshare returned no valid proxies — scraping without proxy")
-        return proxies or None
+        return load_proxies_for_provider(provider)
+    except AllAccountsExhaustedError as exc:
+        logger.error("{}", exc)
+        raise typer.Exit(1) from exc
     except Exception as exc:
-        logger.warning("Could not load Webshare proxies, scraping without proxy: {}", exc)
+        logger.warning(
+            "Could not load {} proxies, scraping without proxy: {}", provider.name, exc
+        )
         return None
 
 

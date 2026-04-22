@@ -12,3 +12,4 @@ input
 redditdownloads
 .env
 threads_to_scrape.txt
+.scraper-state

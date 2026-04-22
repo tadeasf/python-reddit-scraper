@@ -7,6 +7,7 @@ follows pagination tokens, and returns raw post data.
 
 import json
 import time
+from urllib.parse import urlparse
 
 from loguru import logger
 from rich.progress import (
@@ -17,6 +18,26 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
+
+_REDDIT_HOSTS = (
+    "reddit.com",
+    "redditstatic.com",
+    "redditmedia.com",
+    "redd.it",
+)
+
+
+def _only_reddit(route, request) -> None:
+    """Playwright route handler: allow reddit hosts, abort everything else.
+
+    Stops Camoufox/addon traffic to CDNs and filter-list hosts from eating
+    proxy bandwidth — the scraper only needs the reddit JSON endpoint.
+    """
+    host = (urlparse(request.url).hostname or "").lower()
+    if any(host == h or host.endswith("." + h) for h in _REDDIT_HOSTS):
+        route.continue_()
+    else:
+        route.abort()
 
 
 def scrape_subreddit(
@@ -44,6 +65,7 @@ def scrape_subreddit(
     base_url = f"https://old.reddit.com/r/{subreddit}.json?limit=100&raw_json=1"
 
     page = browser.new_page()
+    page.context.route("**/*", _only_reddit)
     progress = (
         None
         if quiet

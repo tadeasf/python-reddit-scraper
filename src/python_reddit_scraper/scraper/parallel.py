@@ -36,11 +36,15 @@ def scrape_worker(
     Returns:
         Tuple of (subreddit_name, list_of_post_dicts).
     """
+    from camoufox import DefaultAddons
     from camoufox.sync_api import Camoufox
 
     from python_reddit_scraper.scraper.core import scrape_subreddit
 
-    camoufox_kwargs: dict = {"headless": True}
+    camoufox_kwargs: dict = {
+        "headless": True,
+        "exclude_addons": [DefaultAddons.UBO],
+    }
     if proxy:
         camoufox_kwargs["proxy"] = proxy
         camoufox_kwargs["geoip"] = True
