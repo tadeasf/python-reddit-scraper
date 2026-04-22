@@ -12,7 +12,11 @@ if TYPE_CHECKING:
 
 
 def scrape_worker(
-    subreddit: str, max_pages: int = 50, delay: float = 1.5, quiet: bool = False
+    subreddit: str,
+    max_pages: int = 50,
+    delay: float = 1.5,
+    quiet: bool = False,
+    proxy: dict | None = None,
 ) -> tuple[str, list[dict]]:
     """
     Standalone scrape function for use with ProcessPoolExecutor.
@@ -25,6 +29,9 @@ def scrape_worker(
         max_pages: Maximum pages to fetch.
         delay: Seconds between page requests.
         quiet: Suppress per-subreddit progress output.
+        proxy: Optional proxy dict with keys ``server``, ``username``, ``password``.
+               When provided, ``geoip=True`` is also set so Camoufox auto-matches
+               locale/timezone to the proxy's exit IP.
 
     Returns:
         Tuple of (subreddit_name, list_of_post_dicts).
@@ -33,7 +40,12 @@ def scrape_worker(
 
     from python_reddit_scraper.scraper.core import scrape_subreddit
 
-    with Camoufox(headless=True) as browser:
+    camoufox_kwargs: dict = {"headless": True}
+    if proxy:
+        camoufox_kwargs["proxy"] = proxy
+        camoufox_kwargs["geoip"] = True
+
+    with Camoufox(**camoufox_kwargs) as browser:
         posts = scrape_subreddit(browser, subreddit, max_pages=max_pages, delay=delay, quiet=quiet)
     return subreddit, posts
 
@@ -45,6 +57,7 @@ def scrape_parallel(
     max_workers: int = 4,
     on_complete=None,
     progress: ProgressDisplay | None = None,
+    proxies: list[dict] | None = None,
 ) -> dict[str, list[dict]]:
     """
     Scrape multiple subreddits in parallel using separate processes.
@@ -61,6 +74,8 @@ def scrape_parallel(
         on_complete: Optional callback ``(sub: str, posts: list[dict]) -> None``
             invoked as each subreddit finishes scraping.
         progress: Optional shared :class:`ProgressDisplay` for the scraping bar.
+        proxies: Optional list of proxy dicts from :func:`proxy_handler.fetch_proxies`.
+            Assigned round-robin across workers. When ``None``, no proxy is used.
 
     Returns:
         Dict mapping subreddit name to its list of post dicts.
@@ -71,8 +86,9 @@ def scrape_parallel(
 
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         future_to_sub: dict = {}
-        for sub in subreddits:
-            future = executor.submit(scrape_worker, sub, max_pages, delay, quiet=quiet)
+        for i, sub in enumerate(subreddits):
+            proxy = proxies[i % len(proxies)] if proxies else None
+            future = executor.submit(scrape_worker, sub, max_pages, delay, quiet=quiet, proxy=proxy)
             future_to_sub[future] = sub
             if progress:
                 progress.mark_scrape_started(sub)

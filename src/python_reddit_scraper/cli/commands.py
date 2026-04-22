@@ -20,6 +20,29 @@ from python_reddit_scraper.downloader.media import extract_all_media, filter_by_
 from python_reddit_scraper.scraper.json_io import parse_json_files
 
 
+def _load_proxies() -> list[dict] | None:
+    """Load Webshare proxies if an API key is configured. Returns None on failure or no key."""
+    from python_reddit_scraper.config import get_webshare_api_key
+    from python_reddit_scraper.scraper.proxy_handler import fetch_proxies
+
+    api_key = get_webshare_api_key()
+    if not api_key:
+        return None
+    try:
+        from camoufox.geolocation import download_mmdb
+
+        download_mmdb()
+        proxies = fetch_proxies(api_key)
+        if proxies:
+            logger.info("Loaded {} Webshare proxy/proxies", len(proxies))
+        else:
+            logger.warning("Webshare returned no valid proxies — scraping without proxy")
+        return proxies or None
+    except Exception as exc:
+        logger.warning("Could not load Webshare proxies, scraping without proxy: {}", exc)
+        return None
+
+
 def _version_callback(value: bool) -> None:
     if value:
         from python_reddit_scraper import __app_name__, __version__
@@ -119,6 +142,8 @@ def download(
 
     check_camoufox_binary()
 
+    proxies = _load_proxies()
+
     if subreddits:
         sub_list = [s.strip().lstrip("r/") for s in subreddits.split(",") if s.strip()]
     else:
@@ -172,6 +197,7 @@ def download(
             max_workers=min(len(sub_list), scrape_workers),
             on_complete=on_sub_complete,
             progress=progress,
+            proxies=proxies,
         )
 
         download_q.put(None)
@@ -234,6 +260,7 @@ def _handle_resume(workers: int) -> None:
                 max_pages=50,
                 max_workers=min(len(pending_subs), max(1, (os.cpu_count() or 2) // 2)),
                 on_complete=on_sub_complete,
+                proxies=_load_proxies(),
             )
         except Exception as exc:
             logger.warning("Could not re-scrape pending subreddits: {}", exc)
