@@ -26,20 +26,20 @@ def _load_proxies() -> list[dict] | None:
     Returns the first working proxy pool or None when no keys are configured.
     Prints a clear error and exits if every account has hit its bandwidth limit.
     """
-    from python_reddit_scraper.config import get_webshare_api_keys
+    from python_reddit_scraper.config import get_webshare_accounts
     from python_reddit_scraper.scraper.proxy_handler import (
         AllAccountsExhaustedError,
         fetch_proxies_with_fallback,
     )
 
-    api_keys = get_webshare_api_keys()
-    if not api_keys:
+    accounts = get_webshare_accounts()
+    if not accounts:
         return None
     try:
         from camoufox.locale import download_mmdb
 
         download_mmdb()
-        return fetch_proxies_with_fallback(api_keys)
+        return fetch_proxies_with_fallback(accounts)
     except AllAccountsExhaustedError as exc:
         logger.error("{}", exc)
         raise typer.Exit(1) from exc

@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 _CONFIG_PATH = Path.home() / ".config" / "python_reddit_scraper" / "config.yaml"
+
+
+@dataclass(frozen=True)
+class WebshareAccount:
+    email: str
+    api_key: str
 
 
 def load_config() -> dict:
@@ -16,17 +23,17 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def get_webshare_api_keys() -> list[str]:
-    """Return all configured Webshare API keys in order.
+def get_webshare_accounts() -> list[WebshareAccount]:
+    """Return all configured Webshare accounts in order.
 
-    Reads ``api_key``, ``api_key2``, ``api_key3``, ... from the config file.
+    Reads ``providers[].accounts[]`` entries where ``name == "webshare"`` from
+    the YAML config file.
     """
     cfg = load_config()
-    keys: list[str] = []
-    if v := cfg.get("api_key"):
-        keys.append(v)
-    i = 2
-    while v := cfg.get(f"api_key{i}"):
-        keys.append(v)
-        i += 1
-    return keys
+    for provider in cfg.get("providers") or []:
+        if provider.get("name") == "webshare":
+            return [
+                WebshareAccount(email=a["email"], api_key=a["api_key"])
+                for a in provider.get("accounts") or []
+            ]
+    return []

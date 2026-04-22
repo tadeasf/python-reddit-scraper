@@ -5,9 +5,11 @@ from __future__ import annotations
 import requests
 from loguru import logger
 
+from python_reddit_scraper.config import WebshareAccount
+
 
 class AllAccountsExhaustedError(Exception):
-    """Raised when every configured Webshare API key has hit its bandwidth limit."""
+    """Raised when every configured Webshare account has hit its bandwidth limit."""
 
 
 def fetch_proxies(api_key: str) -> list[dict]:
@@ -42,56 +44,56 @@ def fetch_proxies(api_key: str) -> list[dict]:
     return proxies
 
 
-def fetch_proxies_with_fallback(api_keys: list[str]) -> list[dict]:
-    """Try each API key in order and return the first working proxy pool.
+def fetch_proxies_with_fallback(accounts: list[WebshareAccount]) -> list[dict]:
+    """Try each account in order and return the first working proxy pool.
 
     "Working" means the API call succeeded *and* at least one valid proxy was
     returned.  An empty result is treated the same as an API error — both
     indicate the account has no usable proxies (quota exhausted, suspended, etc.)
-    — so we skip to the next key.
+    — so we skip to the next account.
 
     Raises:
-        AllAccountsExhaustedError: when every key either errored or returned
+        AllAccountsExhaustedError: when every account either errored or returned
             zero valid proxies, with a message listing how many accounts failed.
     """
-    if not api_keys:
-        raise AllAccountsExhaustedError("No Webshare API keys found in config.")
+    if not accounts:
+        raise AllAccountsExhaustedError("No Webshare accounts found in config.")
 
     last_error: Exception | None = None
 
-    for idx, key in enumerate(api_keys, start=1):
-        key_label = f"account #{idx}"
+    for account in accounts:
+        label = account.email
         try:
-            proxies = fetch_proxies(key)
+            proxies = fetch_proxies(account.api_key)
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else "?"
             logger.warning(
                 "Webshare {}: HTTP {} — skipping (bandwidth limit or invalid key)",
-                key_label,
+                label,
                 status,
             )
             last_error = exc
             continue
         except Exception as exc:
-            logger.warning("Webshare {}: unexpected error — {} — skipping", key_label, exc)
+            logger.warning("Webshare {}: unexpected error — {} — skipping", label, exc)
             last_error = exc
             continue
 
         if not proxies:
             logger.warning(
                 "Webshare {}: returned 0 valid proxies — quota likely exhausted, skipping",
-                key_label,
+                label,
             )
-            last_error = ValueError(f"{key_label} returned no valid proxies")
+            last_error = ValueError(f"{label} returned no valid proxies")
             continue
 
-        logger.info("Webshare {}: {} proxies loaded", key_label, len(proxies))
+        logger.info("Webshare {}: {} proxies loaded", label, len(proxies))
         return proxies
 
-    n = len(api_keys)
+    n = len(accounts)
     raise AllAccountsExhaustedError(
         f"All {n} Webshare account(s) have hit their bandwidth limit or returned no valid "
         f"proxies. Last error: {last_error}. "
-        f"Either wait for your monthly quota to reset or add more API keys to "
-        f"~/.config/python_reddit_scraper/config.yaml (api_key, api_key2, api_key3, ...)."
+        f"Either wait for your monthly quota to reset or add more accounts to "
+        f"~/.config/python_reddit_scraper/config.yaml under providers[].accounts."
     )
