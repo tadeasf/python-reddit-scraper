@@ -6,6 +6,7 @@ import os
 import queue
 import time
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError, URLError
@@ -15,6 +16,9 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from python_reddit_scraper.progress import ProgressDisplay
+
+OnFileDoneCallback = Callable[[str], None]
+OnFileFailedCallback = Callable[[str, str, bool], None]
 
 from python_reddit_scraper.downloader.media import (
     extract_all_media,
@@ -102,8 +106,8 @@ def download_all(
     downloads: list[dict[str, str]],
     output_dir: str,
     workers: int = 16,
-    on_file_done=None,
-    on_file_failed=None,
+    on_file_done: OnFileDoneCallback | None = None,
+    on_file_failed: OnFileFailedCallback | None = None,
     progress: ProgressDisplay | None = None,
 ) -> tuple[int, int, Counter]:
     """Download all media files concurrently.

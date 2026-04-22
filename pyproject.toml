@@ -1,6 +1,6 @@
 [project]
 name = "python-reddit-scraper"
-version = "1.1.1"
+version = "1.2.1"
 description = "Python tool for scraping and downloading media from Reddit"
 authors = [{ name = "Tadeáš Fořt", email = "tadeasfort@proton.me" }]
 dependencies = [
@@ -40,18 +40,18 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "UP",   # pyupgrade
-    "B",    # flake8-bugbear
-    "SIM",  # flake8-simplify
-    "RUF",  # ruff-specific rules
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
 ]
 ignore = [
-    "E501",   # line too long (handled by formatter)
-    "B008",   # do not perform function call in argument defaults (typer uses this)
+    "E501", # line too long (handled by formatter)
+    "B008", # do not perform function call in argument defaults (typer uses this)
 ]
 
 [tool.ruff.lint.isort]
