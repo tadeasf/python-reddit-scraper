@@ -227,29 +227,23 @@ def extract_all_media(posts: list[dict]) -> list[dict[str, str]]:
 
 def filter_by_media_type(
     downloads: list[dict[str, str]],
-    video_only: bool = False,
-    image_only: bool = False,
+    media_types: set[str] | frozenset[str] | None = None,
 ) -> list[dict[str, str]]:
-    """
-    Filter media list by type.
+    """Filter media list by a set of allowed types.
 
     Args:
         downloads: List of dicts with 'url' and 'filename' keys.
-        video_only: Keep only videos + gifs (animations).
-        image_only: Keep only images.
+        media_types: Allowed values from ``{"images", "videos", "gifs"}``.
+            ``None`` or an empty set means "no filter" — all items are kept,
+            including those classified as ``"other"`` (preserves historical
+            behavior where only ``--video-only`` / ``--image-only`` narrowed
+            the set).
 
     Returns:
         Filtered list.
     """
-    if not video_only and not image_only:
+    if not media_types:
         return downloads
 
-    filtered = []
-    for item in downloads:
-        media_type = get_media_type(item["filename"])
-        if (video_only and media_type in ("videos", "gifs")) or (
-            image_only and media_type == "images"
-        ):
-            filtered.append(item)
-
-    return filtered
+    allowed = set(media_types)
+    return [item for item in downloads if get_media_type(item["filename"]) in allowed]

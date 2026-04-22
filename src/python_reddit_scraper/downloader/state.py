@@ -11,7 +11,18 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+from python_reddit_scraper.config import ALL_MEDIA_TYPES
+
 STATE_DIR = ".scraper-state"
+
+
+def _booleans_to_media_types(video_only: bool, image_only: bool) -> frozenset[str]:
+    """Translate legacy CLI booleans to a canonical media-type set."""
+    if image_only:
+        return frozenset({"images"})
+    if video_only:
+        return frozenset({"videos", "gifs"})
+    return ALL_MEDIA_TYPES
 
 
 class SessionState:
@@ -24,21 +35,26 @@ class SessionState:
 
     Args:
         output_dir: The download output directory for this session.
-        video_only: Whether ``--video-only`` filter is active.
-        image_only: Whether ``--image-only`` filter is active.
+        media_types: Allowed media types. ``None`` means "all types".
+            Legacy ``video_only`` / ``image_only`` booleans are accepted
+            for backward compatibility and translated on construction.
         state_path: Explicit path to a state file (used when resuming).
     """
 
     def __init__(
         self,
         output_dir: str,
+        media_types: set[str] | frozenset[str] | None = None,
         video_only: bool = False,
         image_only: bool = False,
         state_path: str | None = None,
     ):
         self.output_dir = output_dir
-        self.video_only = video_only
-        self.image_only = image_only
+        if media_types is not None:
+            self.media_types: frozenset[str] = frozenset(media_types) or ALL_MEDIA_TYPES
+        else:
+            self.media_types = _booleans_to_media_types(video_only, image_only)
+
         self.subreddits: dict[str, str] = {}
         self.media: list[dict] = []
         self._lock = threading.Lock()
@@ -51,10 +67,22 @@ class SessionState:
             ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             self.state_path = os.path.join(STATE_DIR, f"{ts}.json")
 
+    @property
+    def video_only(self) -> bool:
+        """Legacy boolean view — true when filter is videos + gifs only."""
+        return self.media_types == frozenset({"videos", "gifs"})
+
+    @property
+    def image_only(self) -> bool:
+        """Legacy boolean view — true when filter is images only."""
+        return self.media_types == frozenset({"images"})
+
     def _to_dict(self) -> dict:
         return {
             "output_dir": self.output_dir,
             "filters": {
+                "media_types": sorted(self.media_types),
+                # Legacy keys kept for forward-compat with older readers.
                 "video_only": self.video_only,
                 "image_only": self.image_only,
             },
@@ -85,10 +113,18 @@ class SessionState:
             data = json.load(f)
 
         filters = data.get("filters", {})
+        raw_mt = filters.get("media_types")
+        if raw_mt is not None:
+            media_types: frozenset[str] | None = frozenset(raw_mt) & ALL_MEDIA_TYPES or None
+        else:
+            media_types = _booleans_to_media_types(
+                filters.get("video_only", False),
+                filters.get("image_only", False),
+            )
+
         state = cls(
             output_dir=data["output_dir"],
-            video_only=filters.get("video_only", False),
-            image_only=filters.get("image_only", False),
+            media_types=media_types,
             state_path=path,
         )
         state.subreddits = data.get("subreddits", {})

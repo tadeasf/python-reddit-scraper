@@ -14,10 +14,64 @@ from typing import Annotated
 import typer
 from loguru import logger
 
-from python_reddit_scraper.cli.prompt import check_camoufox_binary, prompt_subreddits
+from python_reddit_scraper.cli.prompt import (
+    check_camoufox_binary,
+    prompt_max_pages,
+    prompt_media_types,
+    prompt_output_dir,
+    prompt_subreddits,
+)
+from python_reddit_scraper.config import ALL_MEDIA_TYPES, get_defaults
 from python_reddit_scraper.downloader.engine import download_all, run_download_queue
 from python_reddit_scraper.downloader.media import extract_all_media, filter_by_media_type
 from python_reddit_scraper.scraper.json_io import parse_json_files
+
+DEFAULT_OUTPUT_DIR = "./redditdownloads"
+DEFAULT_MAX_PAGES = 50
+
+
+def _resolve_options(
+    video_only: bool,
+    image_only: bool,
+    output_dir: str | None,
+    max_pages: int | None,
+    *,
+    need_max_pages: bool = True,
+) -> tuple[frozenset[str], str, int | None]:
+    """Apply the CLI → config → prompt ladder for user-tunable options.
+
+    Returns the resolved ``(media_types, output_dir, max_pages)`` triple.
+    ``max_pages`` is ``None`` when ``need_max_pages=False`` (from-json mode).
+    """
+    defaults = get_defaults()
+
+    if video_only:
+        media_types: frozenset[str] = frozenset({"videos", "gifs"})
+    elif image_only:
+        media_types = frozenset({"images"})
+    elif defaults.media_types is not None:
+        media_types = frozenset(defaults.media_types)
+    else:
+        media_types = prompt_media_types(default=ALL_MEDIA_TYPES)
+
+    if output_dir is not None:
+        resolved_out = output_dir
+    elif defaults.output_dir is not None:
+        resolved_out = defaults.output_dir
+    else:
+        resolved_out = prompt_output_dir(DEFAULT_OUTPUT_DIR)
+
+    resolved_pages: int | None
+    if not need_max_pages:
+        resolved_pages = None
+    elif max_pages is not None:
+        resolved_pages = max_pages
+    elif defaults.max_pages is not None:
+        resolved_pages = defaults.max_pages
+    else:
+        resolved_pages = prompt_max_pages(DEFAULT_MAX_PAGES)
+
+    return media_types, resolved_out, resolved_pages
 
 
 def _load_proxies() -> list[dict] | None:
@@ -82,13 +136,14 @@ def download(
         ),
     ] = None,
     output_dir: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--output-dir",
             "-o",
-            help="Base directory for downloaded files. A timestamped subdirectory is created inside.",
+            help="Base directory for downloaded files. A timestamped subdirectory is created inside. "
+            "If omitted, uses the value from config.yaml or prompts interactively.",
         ),
-    ] = "./redditdownloads",
+    ] = None,
     video_only: Annotated[
         bool,
         typer.Option("--video-only", help="Download only videos and GIFs/animations."),
@@ -110,9 +165,13 @@ def download(
         ),
     ] = False,
     max_pages: Annotated[
-        int,
-        typer.Option("--max-pages", help="Max pages to scrape per subreddit (100 posts/page)."),
-    ] = 50,
+        int | None,
+        typer.Option(
+            "--max-pages",
+            help="Max pages to scrape per subreddit (100 posts/page). "
+            "If omitted, uses the value from config.yaml or prompts interactively.",
+        ),
+    ] = None,
     workers: Annotated[
         int,
         typer.Option("--workers", "-w", help="Number of parallel download threads."),
@@ -150,7 +209,10 @@ def download(
         return
 
     if from_json:
-        _handle_from_json(video_only, image_only, workers, output_dir)
+        media_types, resolved_output_dir, _ = _resolve_options(
+            video_only, image_only, output_dir, max_pages, need_max_pages=False
+        )
+        _handle_from_json(media_types, workers, resolved_output_dir)
         return
 
     check_camoufox_binary()
@@ -162,7 +224,10 @@ def download(
     else:
         sub_list = prompt_subreddits()
 
-    session_dir = _build_output_dir(output_dir)
+    media_types, resolved_output_dir, resolved_max_pages = _resolve_options(
+        video_only, image_only, output_dir, max_pages
+    )
+    session_dir = _build_output_dir(resolved_output_dir)
 
     logger.info(
         "Scraping {} subreddit(s): {}",
@@ -175,7 +240,7 @@ def download(
     from python_reddit_scraper.scraper.json_io import save_scraped_json
     from python_reddit_scraper.scraper.parallel import scrape_parallel
 
-    state = SessionState(output_dir=session_dir, video_only=video_only, image_only=image_only)
+    state = SessionState(output_dir=session_dir, media_types=media_types)
     for sub in sub_list:
         state.subreddits[sub] = "pending"
     state.save()
@@ -187,7 +252,7 @@ def download(
 
     def download_consumer():
         ok, fail = run_download_queue(
-            download_q, session_dir, workers, video_only, image_only, state, progress=progress
+            download_q, session_dir, workers, media_types, state, progress=progress
         )
         download_results.append((ok, fail))
 
@@ -206,7 +271,7 @@ def download(
     with progress:
         scrape_parallel(
             sub_list,
-            max_pages=max_pages,
+            max_pages=resolved_max_pages,
             max_workers=min(len(sub_list), scrape_workers),
             on_complete=on_sub_complete,
             progress=progress,
@@ -258,11 +323,7 @@ def _handle_resume(workers: int) -> None:
             def on_sub_complete(sub: str, posts: list[dict]):
                 state.mark_subreddit_scraped(sub)
                 media = extract_all_media(posts)
-                media = filter_by_media_type(
-                    media,
-                    video_only=state.video_only,
-                    image_only=state.image_only,
-                )
+                media = filter_by_media_type(media, media_types=state.media_types)
                 if media:
                     state.set_media_manifest(state.media + media)
                 state.save()
@@ -321,7 +382,7 @@ def _handle_resume(workers: int) -> None:
 
 
 def _handle_from_json(
-    video_only: bool, image_only: bool, workers: int, base_output_dir: str
+    media_types: frozenset[str], workers: int, base_output_dir: str
 ) -> None:
     """Handle --from-json mode: load JSON files and download."""
     logger.info("Loading posts from ./input/ JSON files...")
@@ -336,10 +397,9 @@ def _handle_from_json(
     all_media = extract_all_media(posts)
     logger.info("Found {} unique media files", len(all_media))
 
-    all_media = filter_by_media_type(all_media, video_only=video_only, image_only=image_only)
-    if video_only or image_only:
-        label = "videos+gifs" if video_only else "images"
-        logger.info("After filter: {} {}", len(all_media), label)
+    if media_types and media_types != ALL_MEDIA_TYPES:
+        all_media = filter_by_media_type(all_media, media_types=media_types)
+        logger.info("After filter: {} {}", len(all_media), ", ".join(sorted(media_types)))
 
     if not all_media:
         logger.warning("No media files matched the filter criteria.")
