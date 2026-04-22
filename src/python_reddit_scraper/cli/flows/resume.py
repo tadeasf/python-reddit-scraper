@@ -18,7 +18,6 @@ from python_reddit_scraper.constants import (
 from python_reddit_scraper.downloader.engine import download_all
 from python_reddit_scraper.downloader.media import extract_all_media, filter_by_media_type
 from python_reddit_scraper.downloader.state import SessionState
-from python_reddit_scraper.history import record_run
 from python_reddit_scraper.ui.banner import print_banner
 from python_reddit_scraper.ui.prompts import pick_resume_session
 from python_reddit_scraper.ui.summary import print_summary
@@ -88,15 +87,6 @@ def run_resume(workers: int | None) -> None:
         list(state.subreddits.keys()),
         started_at=started_at,
         title="Resume summary",
-    )
-
-    record_run(
-        mode="resume",
-        subreddits=list(state.subreddits.keys()),
-        duration_s=time.time() - started_at,
-        successful=ok,
-        failed=fail,
-        output_dir=output_dir,
     )
 
     remaining = state.get_pending_media()

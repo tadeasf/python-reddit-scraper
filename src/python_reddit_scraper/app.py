@@ -11,7 +11,6 @@ import typer
 import python_reddit_scraper.log  # noqa: F401 — configure logging on import
 from python_reddit_scraper.cli.commands import download
 from python_reddit_scraper.cli.configure import configure
-from python_reddit_scraper.cli.history_cmd import history
 
 app = typer.Typer(
     name="download-reddit-media",
@@ -22,26 +21,20 @@ app = typer.Typer(
 app.command()(download)
 
 
-_SUBCOMMANDS = {
-    "configure": configure,
-    "history": history,
-}
-
-
 def main() -> None:
     """CLI dispatch.
 
-    Recognised subcommands (``configure``, ``history``) are routed to their own
-    tiny Typer apps so they don't need to share option signatures with the
-    default ``download`` command. Everything else (including bare invocation)
-    routes to ``download``.
+    ``download-reddit-media configure`` runs the defaults-setup helper;
+    everything else (including bare invocation) routes to ``download``.
     """
-    if len(sys.argv) >= 2 and sys.argv[1] in _SUBCOMMANDS:
-        name = sys.argv.pop(1)
-        subcommand = _SUBCOMMANDS[name]
-        sub_app = typer.Typer(name=f"download-reddit-media {name}", add_completion=False)
-        sub_app.command()(subcommand)
-        sub_app()
+    if len(sys.argv) >= 2 and sys.argv[1] == "configure":
+        sys.argv.pop(1)
+        configure_app = typer.Typer(
+            name="download-reddit-media configure",
+            add_completion=False,
+        )
+        configure_app.command()(configure)
+        configure_app()
         return
     app()
 

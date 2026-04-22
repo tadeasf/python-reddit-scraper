@@ -16,7 +16,6 @@ from python_reddit_scraper.constants import ALL_MEDIA_TYPES
 from python_reddit_scraper.downloader.engine import run_download_queue
 from python_reddit_scraper.downloader.media import extract_all_media, filter_by_media_type
 from python_reddit_scraper.downloader.state import SessionState
-from python_reddit_scraper.history import record_run
 from python_reddit_scraper.progress import ProgressDisplay
 from python_reddit_scraper.scraper.json_io import save_scraped_json
 from python_reddit_scraper.scraper.parallel import scrape_parallel
@@ -64,15 +63,7 @@ def run_live(
     started_at = time.time()
 
     if dry_run:
-        total = _run_dry(sub_list, opts, proxies, started_at)
-        record_run(
-            mode="dry-run",
-            subreddits=sub_list,
-            duration_s=time.time() - started_at,
-            successful=total,
-            failed=0,
-            output_dir=session_dir,
-        )
+        _run_dry(sub_list, opts, proxies, started_at)
         return
 
     state = SessionState(output_dir=session_dir, media_types=opts.media_types)
@@ -129,15 +120,6 @@ def run_live(
         started_at=started_at,
     )
 
-    record_run(
-        mode="live",
-        subreddits=list(state.subreddits.keys()),
-        duration_s=time.time() - started_at,
-        successful=total_ok,
-        failed=total_fail,
-        output_dir=session_dir,
-    )
-
     if total_fail == 0:
         state.flush_and_cleanup()
     else:
@@ -167,12 +149,8 @@ def _run_preflight(sub_list: list[str], proxies: list[dict] | None) -> list[str]
     return keep
 
 
-def _run_dry(sub_list, opts, proxies, started_at: float) -> int:
-    """Scrape metadata only; print a dry-run summary; write nothing.
-
-    Returns the total count of media that *would* have been downloaded so the
-    caller can record it in history.
-    """
+def _run_dry(sub_list, opts, proxies, started_at: float) -> None:
+    """Scrape metadata only; print a dry-run summary; write nothing."""
     media_types = opts.media_types or ALL_MEDIA_TYPES
     counts: dict[str, Counter[str]] = {sub: Counter() for sub in sub_list}
     progress = ProgressDisplay(total_subs=len(sub_list))
@@ -194,7 +172,6 @@ def _run_dry(sub_list, opts, proxies, started_at: float) -> int:
         )
 
     print_dry_run(counts, started_at=started_at)
-    return sum(sum(c.values()) for c in counts.values())
 
 
 def _media_category(filename: str) -> str:
