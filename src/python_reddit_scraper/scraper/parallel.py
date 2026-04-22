@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,8 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from python_reddit_scraper.progress import ProgressDisplay
+
+OnCompleteCallback = Callable[[str, list[dict]], None]
 
 
 def scrape_worker(
@@ -59,7 +62,7 @@ def scrape_parallel(
     max_pages: int = 50,
     delay: float = 1.5,
     max_workers: int = 4,
-    on_complete=None,
+    on_complete: OnCompleteCallback | None = None,
     progress: ProgressDisplay | None = None,
     proxies: list[dict] | None = None,
 ) -> dict[str, list[dict]]:

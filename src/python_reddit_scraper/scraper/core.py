@@ -5,8 +5,11 @@ Navigates old.reddit.com JSON API using a stealth Firefox browser,
 follows pagination tokens, and returns raw post data.
 """
 
+from __future__ import annotations
+
 import json
 import time
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from loguru import logger
@@ -18,6 +21,9 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser
 
 _REDDIT_HOSTS = (
     "reddit.com",
@@ -41,7 +47,7 @@ def _only_reddit(route, request) -> None:
 
 
 def scrape_subreddit(
-    browser,
+    browser: Browser,
     subreddit: str,
     max_pages: int = 50,
     delay: float = 1.5,
