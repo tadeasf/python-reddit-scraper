@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from loguru import logger
-
 from python_reddit_scraper.config import Defaults, get_defaults, save_defaults
 from python_reddit_scraper.constants import ALL_MEDIA_TYPES
 from python_reddit_scraper.ui.prompts import (
@@ -13,6 +11,7 @@ from python_reddit_scraper.ui.prompts import (
     prompt_scrape_workers,
     prompt_workers,
 )
+from python_reddit_scraper.ui.summary import print_defaults_panel
 
 
 def configure() -> None:
@@ -45,9 +44,13 @@ def configure() -> None:
             scrape_workers=scrape_workers,
         )
     )
-    logger.success("Saved defaults to {}", path)
-    logger.info("  media_types:    {}", ", ".join(sorted(media_types)))
-    logger.info("  output_dir:     {}", output_dir)
-    logger.info("  max_pages:      {}", max_pages)
-    logger.info("  workers:        {}", workers)
-    logger.info("  scrape_workers: {}", scrape_workers)
+    print_defaults_panel(
+        path,
+        {
+            "media_types": ", ".join(sorted(media_types)),
+            "output_dir": output_dir,
+            "max_pages": max_pages,
+            "workers": workers,
+            "scrape_workers": scrape_workers,
+        },
+    )
